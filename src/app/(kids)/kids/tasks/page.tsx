@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { completeTask } from "@/lib/actions/tasks"
+import { completeTask, cancelTaskCompletion } from "@/lib/actions/tasks"
 import { cn } from "@/lib/utils"
 import { CATEGORY_LABELS } from "@/lib/constants"
 import { useToast } from "@/components/ui/ToastProvider"
@@ -50,15 +50,29 @@ export default function KidsTasksPage() {
     fetchTasks()
   }, [fetchTasks])
 
-  async function handleComplete(taskId: string) {
-    setCompleting(taskId)
+  async function handleToggle(task: KidTask) {
+    if (completing) return
+    const completion = task.completions.find(
+      (c) => c.status === "APPROVED" || c.status === "PENDING"
+    )
+    setCompleting(task.id)
     try {
-      await completeTask(taskId)
-      fetchTasks()
+      if (completion) {
+        await cancelTaskCompletion(completion.id)
+      } else {
+        await completeTask(task.id)
+      }
+      await fetchTasks()
       router.refresh()
-      toast("任务完成！等待审核 ✨", "success")
-    } catch (e: any) {
-      toast(e.message || "提交失败", "error")
+      toast(
+        completion
+          ? "已取消完成，可以重新打勾哦"
+          : task.autoApprove ? "任务完成！积分已到账 ⭐" : "任务完成！等待审核 ✨",
+        "success"
+      )
+    } catch (e: unknown) {
+      await fetchTasks()
+      toast(e instanceof Error ? e.message : "操作失败，请再试一次", "error")
     } finally {
       setCompleting(null)
     }
@@ -99,9 +113,11 @@ export default function KidsTasksPage() {
       ) : (
         <div className="space-y-3">
           {tasks.map((task) => {
-            const completion = task.completions[0]
-            const isDone = completion && (completion.status === "APPROVED" || completion.status === "PENDING")
-            const isRejected = completion?.status === "REJECTED"
+            const completion = task.completions.find(
+              (c) => c.status === "APPROVED" || c.status === "PENDING"
+            )
+            const isDone = Boolean(completion)
+            const isRejected = !isDone && task.completions.some((c) => c.status === "REJECTED")
 
             return (
               <div
@@ -135,16 +151,27 @@ export default function KidsTasksPage() {
                       <span className="text-xs text-candy-green">自动</span>
                     )}
                   </div>
+                  {isDone && (
+                    <p className="text-xs text-candy-green mt-1">
+                      {completion?.status === "PENDING" ? "等待审核" : "已完成"} · 再点勾勾可取消
+                    </p>
+                  )}
                 </div>
                 <button
-                  onClick={() => handleComplete(task.id)}
-                  disabled={isDone || isRejected || completing === task.id}
+                  type="button"
+                  onClick={() => handleToggle(task)}
+                  disabled={isRejected || completing !== null}
+                  aria-label={`${isDone ? "取消完成" : "完成任务"}：${task.name}`}
+                  aria-pressed={isDone}
+                  aria-busy={completing === task.id}
+                  title={isDone ? "取消完成" : "完成任务"}
                   className={cn(
                     "h-12 w-12 rounded-full flex items-center justify-center text-xl font-bold transition-all",
                     isDone
-                      ? "bg-candy-green text-white cursor-default"
+                      ? "bg-candy-green text-white hover:opacity-80 active:scale-95"
                       : "bg-brand-100 text-brand-500 hover:bg-brand-200 active:scale-95",
-                    completing === task.id && "animate-pulse"
+                    completing === task.id && "animate-pulse",
+                    completing !== null ? "cursor-wait" : "disabled:cursor-not-allowed"
                   )}
                 >
                   {completing === task.id ? "⏳" : isDone ? "✅" : "✓"}

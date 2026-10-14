@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { createTask, deleteTask, approveTask, rejectTask } from "@/lib/actions/tasks"
+import { createTask, updateTask, deleteTask, approveTask, rejectTask } from "@/lib/actions/tasks"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { CardSkeleton } from "@/components/ui/Skeleton"
@@ -18,6 +18,25 @@ const CATEGORIES = [
   { value: "OTHER", label: "其他" },
 ]
 
+const TASK_TYPE_LABELS: Record<string, string> = {
+  DAILY: "日常任务",
+  CHALLENGE: "挑战任务",
+  ONETIME: "一次性任务",
+  HABIT: "习惯养成",
+}
+
+const TASK_FREQUENCY_LABELS: Record<string, string> = {
+  DAILY: "每天",
+  WEEKLY: "每周",
+  MANUAL: "手动",
+}
+
+const DIFFICULTY_CONFIG: Record<string, { label: string; stars: string; className: string }> = {
+  EASY: { label: "简单", stars: "⭐", className: "bg-candy-green/10 text-candy-green" },
+  MEDIUM: { label: "中等", stars: "⭐⭐", className: "bg-candy-orange/10 text-candy-orange" },
+  HARD: { label: "困难", stars: "⭐⭐⭐", className: "bg-candy-red/10 text-candy-red" },
+}
+
 type TaskData = {
   id: string
   name: string
@@ -25,6 +44,8 @@ type TaskData = {
   icon: string | null
   category: string
   type: string
+  frequency: string
+  difficulty: string
   points: number
   autoApprove: boolean
   status: string
@@ -68,14 +89,35 @@ export default function AdminTasksPage() {
     fetchData()
   }, [fetchData])
 
-  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
+  function openCreateForm() {
+    setEditId(null)
+    setError("")
+    setShowCreateForm(true)
+  }
+
+  function openEditForm(task: TaskData) {
+    setEditId(task.id)
+    setError("")
+    setShowCreateForm(true)
+  }
+
+  async function handleTaskSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError("")
-    const formData = new FormData(e.currentTarget)
+    const form = e.currentTarget
+    const formData = new FormData(form)
     try {
-      await createTask(formData)
+      if (editId) {
+        formData.set("id", editId)
+        // 未勾选的 checkbox 不会出现在 FormData 中，显式传递 false 才能关闭自动审核。
+        formData.set("autoApprove", formData.get("autoApprove") === "true" ? "true" : "false")
+        await updateTask(formData)
+      } else {
+        await createTask(formData)
+      }
       setShowCreateForm(false)
-      e.currentTarget.reset()
+      setEditId(null)
+      form.reset()
       fetchData()
       router.refresh()
     } catch (err: any) {
@@ -116,13 +158,10 @@ export default function AdminTasksPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-warm-800">📋 任务管理</h1>
         <button
-          onClick={() => {
-            setShowCreateForm(!showCreateForm)
-            setEditId(null)
-          }}
+          onClick={showCreateForm ? () => setShowCreateForm(false) : openCreateForm}
           className="h-10 px-5 bg-admin-primary text-white rounded-xl text-sm font-semibold hover:brightness-110 transition-all"
         >
-          + 创建任务
+          {showCreateForm ? "收起表单" : "+ 创建任务"}
         </button>
       </div>
 
@@ -148,8 +187,14 @@ export default function AdminTasksPage() {
 
       {showCreateForm && (
         <TaskForm
-          onSubmit={handleCreate}
-          onCancel={() => setShowCreateForm(false)}
+          key={editId || "create"}
+          task={editId ? tasks.find((task) => task.id === editId) : undefined}
+          onSubmit={handleTaskSubmit}
+          onCancel={() => {
+            setShowCreateForm(false)
+            setEditId(null)
+            setError("")
+          }}
           error={error}
         />
       )}
@@ -165,25 +210,62 @@ export default function AdminTasksPage() {
             tasks.map((task) => (
               <div
                 key={task.id}
-                className="bg-white rounded-xl shadow-card p-4 flex items-center gap-4"
+                className="bg-white rounded-xl shadow-card p-4 flex flex-col gap-4 sm:flex-row sm:items-start"
               >
-                <div className="text-3xl">{task.icon || "📌"}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-warm-800">{task.name}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-warm-100 text-warm-500">
-                      {CATEGORIES.find((c) => c.value === task.category)?.label}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-sm text-warm-400">
-                    <span>+{task.points}⭐</span>
-                    {task.autoApprove && <span className="text-candy-green">自动通过</span>}
-                    {task.assignees.length > 0 && (
-                      <span>分配: {task.assignees.map((a) => a.nickname).join(", ")}</span>
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className="text-3xl shrink-0" aria-hidden="true">{task.icon || "📌"}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold text-warm-800 truncate">{task.name}</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-warm-100 text-warm-500">
+                        {CATEGORIES.find((c) => c.value === task.category)?.label || task.category}
+                      </span>
+                    </div>
+                    {task.description && (
+                      <p className="mt-1 text-sm text-warm-500 line-clamp-2">{task.description}</p>
                     )}
+                    <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
+                      <span className="px-2 py-1 rounded-md bg-brand-50 text-brand-700">
+                        积分：+{task.points}⭐
+                      </span>
+                      <span className={cn(
+                        "px-2 py-1 rounded-md",
+                        DIFFICULTY_CONFIG[task.difficulty]?.className || "bg-warm-100 text-warm-600"
+                      )}>
+                        难度：{DIFFICULTY_CONFIG[task.difficulty]?.label || task.difficulty}
+                        {DIFFICULTY_CONFIG[task.difficulty]?.stars && (
+                          <span className="ml-1" aria-label={`${DIFFICULTY_CONFIG[task.difficulty].label}难度`}>
+                            {DIFFICULTY_CONFIG[task.difficulty].stars}
+                          </span>
+                        )}
+                      </span>
+                      <span className="px-2 py-1 rounded-md bg-warm-100 text-warm-600">
+                        类型：{TASK_TYPE_LABELS[task.type] || task.type}
+                      </span>
+                      <span className="px-2 py-1 rounded-md bg-warm-100 text-warm-600">
+                        频率：{TASK_FREQUENCY_LABELS[task.frequency] || task.frequency}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-warm-400">
+                      {task.autoApprove && <span className="text-candy-green">自动通过</span>}
+                      {task.assignees.length > 0 ? (
+                        <span>分配：{task.assignees.map((a) => a.nickname).join(", ")}</span>
+                      ) : (
+                        <span>分配：全员</span>
+                      )}
+                      {task.completions.length > 0 && (
+                        <span>今日完成：{task.completions.filter((completion) => completion.status === "APPROVED").length} 人</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 self-end sm:self-start shrink-0">
+                  <button
+                    onClick={() => openEditForm(task)}
+                    className="h-8 px-3 border border-warm-200 rounded-lg text-xs text-warm-500 hover:border-admin-primary hover:text-admin-primary transition-colors"
+                  >
+                    编辑
+                  </button>
                   <AssignDialog
                     taskId={task.id}
                     onAssign={() => {
@@ -248,17 +330,19 @@ export default function AdminTasksPage() {
 }
 
 function TaskForm({
+  task,
   onSubmit,
   onCancel,
   error,
 }: {
+  task?: TaskData
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
   onCancel: () => void
   error?: string
 }) {
   return (
     <form onSubmit={onSubmit} className="bg-white rounded-xl shadow-card p-5 space-y-4">
-      <h3 className="font-semibold text-warm-700">创建新任务</h3>
+      <h3 className="font-semibold text-warm-700">{task ? "编辑任务" : "创建新任务"}</h3>
 
       {error && (
         <div className="bg-candy-red/10 text-candy-red text-sm rounded-xl p-3">{error}</div>
@@ -270,13 +354,14 @@ function TaskForm({
           <input
             name="name"
             required
+            defaultValue={task?.name || ""}
             placeholder="如：刷牙"
             className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none"
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-warm-600 mb-1">图标</label>
-          <select name="icon" className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none">
+          <select name="icon" defaultValue={task?.icon || ""} className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none">
             <option value="">选择图标</option>
             {EMOJI_PRESETS.map((emoji) => (
               <option key={emoji} value={emoji}>{emoji}</option>
@@ -285,7 +370,7 @@ function TaskForm({
         </div>
         <div>
           <label className="block text-sm font-medium text-warm-600 mb-1">分类</label>
-          <select name="category" className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none">
+          <select name="category" defaultValue={task?.category || "OTHER"} className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none">
             {CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
@@ -293,7 +378,7 @@ function TaskForm({
         </div>
         <div>
           <label className="block text-sm font-medium text-warm-600 mb-1">类型</label>
-          <select name="type" className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none">
+          <select name="type" defaultValue={task?.type || "DAILY"} className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none">
             <option value="DAILY">日常任务</option>
             <option value="CHALLENGE">挑战任务</option>
             <option value="ONETIME">一次性任务</option>
@@ -304,14 +389,14 @@ function TaskForm({
           <input
             name="points"
             type="number"
-            defaultValue={5}
+            defaultValue={task?.points ?? 5}
             min={1}
             className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none"
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-warm-600 mb-1">难度</label>
-          <select name="difficulty" className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none">
+          <select name="difficulty" defaultValue={task?.difficulty || "EASY"} className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none">
             <option value="EASY">简单</option>
             <option value="MEDIUM">中等</option>
             <option value="HARD">困难</option>
@@ -321,6 +406,7 @@ function TaskForm({
           <label className="block text-sm font-medium text-warm-600 mb-1">描述 (给小朋友看)</label>
           <input
             name="description"
+            defaultValue={task?.description || ""}
             placeholder="如：把牙齿刷得白白的，笑起来更自信！"
             className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none"
           />
@@ -328,7 +414,7 @@ function TaskForm({
       </div>
 
       <div className="flex items-center gap-2">
-        <input type="checkbox" name="autoApprove" value="true" id="autoApprove" className="rounded" />
+        <input type="checkbox" name="autoApprove" value="true" id="autoApprove" defaultChecked={task?.autoApprove ?? false} className="rounded" />
         <label htmlFor="autoApprove" className="text-sm text-warm-600">自动通过 (不需要家长审核)</label>
       </div>
 
@@ -337,7 +423,7 @@ function TaskForm({
           type="submit"
           className="h-10 px-5 bg-admin-primary text-white rounded-xl text-sm font-semibold hover:brightness-110 transition-all"
         >
-          创建任务
+          {task ? "保存修改" : "创建任务"}
         </button>
         <button
           type="button"

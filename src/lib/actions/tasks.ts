@@ -64,11 +64,17 @@ export async function updateTask(formData: FormData) {
   const session = await auth()
   if (!session?.user?.id) throw new Error("请先登录")
 
+  const member = await prisma.familyMember.findFirst({
+    where: { userId: session.user.id, role: "PARENT" },
+  })
+  if (!member) throw new Error("只有家长才能修改任务")
+
   const id = formData.get("id") as string
   if (!id) throw new Error("任务ID不能为空")
 
   const existing = await prisma.task.findUnique({ where: { id } })
   if (!existing) throw new Error("任务不存在")
+  if (existing.familyId !== member.familyId) throw new Error("无权修改此任务")
 
   const name = formData.get("name") as string
 
@@ -95,6 +101,8 @@ export async function updateTask(formData: FormData) {
   })
 
   revalidatePath("/admin/tasks")
+  revalidatePath("/kids/tasks")
+  revalidatePath("/kids")
 }
 
 export async function deleteTask(id: string) {
@@ -148,6 +156,8 @@ export async function completeTask(taskId: string) {
   })
   if (!task) throw new Error("任务不存在")
 
+  if (task.familyId !== member.familyId) throw new Error("无权完成此任务")
+
   const isAssigned = task.assignees.some((a) => a.id === member.id)
 
   if (!isAssigned && task.assignees.length > 0) {
@@ -173,26 +183,30 @@ export async function completeTask(taskId: string) {
     member.familyId
   )
 
-  const completion = await prisma.taskCompletion.create({
-    data: {
-      taskId,
-      memberId: member.id,
-      pointsEarned: totalPoints,
-      status: task.autoApprove ? "APPROVED" : "PENDING",
-      approvedBy: task.autoApprove ? session.user.id : null,
-      approvedAt: task.autoApprove ? new Date() : null,
-      date: today,
-    },
-  })
-
-  try {
+  const completion = await prisma.$transaction(async (tx) => {
+    const created = await tx.taskCompletion.create({
+      data: {
+        taskId,
+        memberId: member.id,
+        pointsEarned: totalPoints,
+        status: task.autoApprove ? "APPROVED" : "PENDING",
+        approvedBy: task.autoApprove ? session.user.id : null,
+        approvedAt: task.autoApprove ? new Date() : null,
+        date: today,
+      },
+    })
     if (task.autoApprove) {
-      await prisma.familyMember.update({
+      await tx.familyMember.update({
         where: { id: member.id },
         data: { currentPoints: { increment: totalPoints } },
       })
-      await checkAchievements(member.id, completion.id)
-    } else {
+      await checkAchievements(member.id, created.id, tx)
+    }
+    return created
+  })
+
+  try {
+    if (!task.autoApprove) {
       const parents = await prisma.familyMember.findMany({
         where: { familyId: member.familyId, role: "PARENT" },
         select: { userId: true },
@@ -217,6 +231,67 @@ export async function completeTask(taskId: string) {
   revalidatePath("/kids/tasks")
   revalidatePath("/kids")
   revalidatePath("/kids/achievements")
+  revalidatePath("/admin/tasks")
+}
+
+export async function cancelTaskCompletion(completionId: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error("请先登录")
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  await prisma.$transaction(async (tx) => {
+    const completion = await tx.taskCompletion.findFirst({
+      where: {
+        id: completionId,
+        member: { userId: session.user.id },
+        date: { gte: today, lt: tomorrow },
+        status: { in: ["PENDING", "APPROVED"] },
+      },
+    })
+    if (!completion) throw new Error("只能取消自己今天已提交的任务，请刷新后重试")
+
+    // 状态和积分都必须匹配，避免重复取消或与家长审核同时发生时重复扣分。
+    const deleted = await tx.taskCompletion.deleteMany({
+      where: {
+        id: completion.id,
+        status: completion.status,
+        pointsEarned: completion.pointsEarned,
+      },
+    })
+    if (deleted.count !== 1) throw new Error("任务状态已更新，请刷新后重试")
+
+    if (completion.status === "APPROVED") {
+      await tx.familyMember.update({
+        where: { id: completion.memberId },
+        data: { currentPoints: { decrement: completion.pointsEarned } },
+      })
+    }
+    // 成就奖励已经包含在 pointsEarned 中；撤回本次解锁，重新完成时可再次解锁。
+    await tx.achievementGrant.deleteMany({
+      where: { memberId: completion.memberId, triggeredBy: completion.id },
+    })
+    await tx.notification.deleteMany({
+      where: {
+        memberId: completion.memberId,
+        type: "TASK_COMPLETED",
+        data: JSON.stringify({
+          completionId: completion.id,
+          taskId: completion.taskId,
+          memberId: completion.memberId,
+        }),
+      },
+    })
+  })
+
+  revalidatePath("/kids/tasks")
+  revalidatePath("/kids")
+  revalidatePath("/kids/achievements")
+  revalidatePath("/admin/tasks")
+  revalidatePath("/admin/notifications")
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -228,14 +303,23 @@ export async function approveTask(completionId: string, note?: string) {
   if (!session?.user?.id) throw new Error("请先登录")
 
   const completion = await prisma.$transaction(async (tx) => {
-    const updated = await tx.taskCompletion.update({
-      where: { id: completionId },
+    const claimed = await tx.taskCompletion.updateMany({
+      where: {
+        id: completionId,
+        status: "PENDING",
+        task: { family: { members: { some: { userId: session.user.id, role: "PARENT" } } } },
+      },
       data: {
         status: "APPROVED",
         approvedBy: session.user.id,
         approvedAt: new Date(),
         parentNote: note || null,
       },
+    })
+    if (claimed.count !== 1) throw new Error("任务已撤回或已审核，请刷新后重试")
+
+    const updated = await tx.taskCompletion.findUniqueOrThrow({
+      where: { id: completionId },
       include: { member: { select: { nickname: true, userId: true } }, task: { select: { name: true } } },
     })
 
@@ -244,11 +328,9 @@ export async function approveTask(completionId: string, note?: string) {
       data: { currentPoints: { increment: updated.pointsEarned } },
     })
 
-    return updated
-  })
+    await checkAchievements(updated.memberId, completionId, tx)
 
-  await checkAchievements(completion.memberId, completionId).catch((e) => {
-    console.error("Achievement check failed:", e)
+    return updated
   })
 
   try {
@@ -276,7 +358,11 @@ export async function rejectTask(completionId: string, note?: string) {
   if (!session?.user?.id) throw new Error("请先登录")
 
   const rejection = await prisma.taskCompletion.update({
-    where: { id: completionId },
+    where: {
+      id: completionId,
+      status: "PENDING",
+      task: { family: { members: { some: { userId: session.user.id, role: "PARENT" } } } },
+    },
     data: {
       status: "REJECTED",
       approvedBy: session.user.id,

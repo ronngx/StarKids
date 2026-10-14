@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import type { Prisma } from "@prisma/client"
 import { SPECIES_EMOJI, STAGE_CONFIG } from "@/lib/constants"
 
 type AchievementCondition = {
@@ -13,18 +14,22 @@ type AchievementCondition = {
   tags?: string[]
 }
 
-export async function checkAchievements(memberId: string, completionId?: string) {
+export async function checkAchievements(
+  memberId: string,
+  completionId?: string,
+  db: Prisma.TransactionClient = prisma,
+) {
   const [member, allAchievements, grantedAchievements] = await Promise.all([
-    prisma.familyMember.findUnique({
+    db.familyMember.findUnique({
       where: { id: memberId },
       select: { familyId: true },
     }),
-    prisma.achievement.findMany({
+    db.achievement.findMany({
       where: {
         isActive: true,
       },
     }),
-    prisma.achievementGrant.findMany({
+    db.achievementGrant.findMany({
       where: { memberId },
       select: { achievementId: true },
     }),
@@ -42,10 +47,10 @@ export async function checkAchievements(memberId: string, completionId?: string)
     if (grantedIds.has(achievement.id)) continue
 
     const condition = JSON.parse(achievement.condition) as AchievementCondition
-    const isMet = await checkCondition(condition, memberId)
+    const isMet = await checkCondition(condition, memberId, db)
 
     if (isMet) {
-      await prisma.achievementGrant.create({
+      await db.achievementGrant.create({
         data: {
           achievementId: achievement.id,
           memberId,
@@ -55,17 +60,17 @@ export async function checkAchievements(memberId: string, completionId?: string)
       })
 
       if (achievement.bonusPoints > 0 && completionId) {
-        const completion = await prisma.taskCompletion.findUnique({
+        const completion = await db.taskCompletion.findUnique({
           where: { id: completionId },
         })
         if (completion) {
-          await prisma.taskCompletion.update({
+          await db.taskCompletion.update({
             where: { id: completionId },
             data: {
                 pointsEarned: completion.pointsEarned + achievement.bonusPoints,
             },
           })
-          await prisma.familyMember.update({
+          await db.familyMember.update({
             where: { id: memberId },
             data: { currentPoints: { increment: achievement.bonusPoints } },
           })
@@ -81,7 +86,8 @@ export async function checkAchievements(memberId: string, completionId?: string)
 
 async function checkCondition(
   condition: AchievementCondition,
-  memberId: string
+  memberId: string,
+  db: Prisma.TransactionClient,
 ): Promise<boolean> {
   switch (condition.type) {
     case "TASK_COUNT": {
@@ -89,31 +95,31 @@ async function checkCondition(
       if (condition.category) where.task = { category: condition.category }
       if (condition.type_filter) where.task = { ...(where.task || {}), type: condition.type_filter }
       if (condition.tags) where.task = { ...(where.task || {}), tags: { hasSome: condition.tags } }
-      const count = await prisma.taskCompletion.count({ where })
+      const count = await db.taskCompletion.count({ where })
       return count >= (condition.count || 0)
     }
 
     case "CONSECUTIVE_DAYS": {
-      const days = await getConsecutiveDays(memberId)
+      const days = await getConsecutiveDays(memberId, db)
       return days >= (condition.days || 0)
     }
 
     case "STREAK": {
       const where: any = { memberId, status: "APPROVED" }
       if (condition.category) where.task = { category: condition.category }
-      const days = await getConsecutiveDays(memberId, where)
+      const days = await getConsecutiveDays(memberId, db, where)
       return days >= (condition.days || 0)
     }
 
     case "REDEMPTION_COUNT": {
-      const count = await prisma.rewardRedemption.count({
+      const count = await db.rewardRedemption.count({
         where: { memberId, status: "APPROVED" },
       })
       return count >= (condition.count || 0)
     }
 
     case "TOTAL_POINTS": {
-      const result = await prisma.taskCompletion.aggregate({
+      const result = await db.taskCompletion.aggregate({
         where: { memberId, status: "APPROVED" },
         _sum: { pointsEarned: true },
       })
@@ -128,7 +134,7 @@ async function checkCondition(
       startDate.setDate(startDate.getDate() - days)
       startDate.setHours(0, 0, 0, 0)
 
-      const completions = await prisma.taskCompletion.findMany({
+      const completions = await db.taskCompletion.findMany({
         where: {
           memberId,
           status: "APPROVED",
@@ -142,7 +148,7 @@ async function checkCondition(
       const actualRate = Math.round((daysWithCompletions / totalDays) * 100)
 
       if (condition.zeroRejection) {
-        const rejections = await prisma.taskCompletion.count({
+        const rejections = await db.taskCompletion.count({
           where: {
             memberId,
             status: "REJECTED",
@@ -162,9 +168,10 @@ async function checkCondition(
 
 async function getConsecutiveDays(
   memberId: string,
+  db: Prisma.TransactionClient,
   baseWhere?: any
 ): Promise<number> {
-  const completions = await prisma.taskCompletion.findMany({
+  const completions = await db.taskCompletion.findMany({
     where: { memberId, status: "APPROVED", ...(baseWhere || {}) },
     select: { date: true },
     orderBy: { date: "desc" },
