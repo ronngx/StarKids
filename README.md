@@ -225,8 +225,11 @@ Open your browser at [http://localhost:3000](http://localhost:3000)
 ### 一键部署 / One-Click Deploy
 
 ```bash
-# 构建并启动所有服务 / Build and start all services
-docker compose up -d
+# 本地构建应用镜像并启动所有服务 / Build the app image locally and start all services
+docker compose up -d --build
+
+# 或使用部署脚本 / Or use the deployment script
+bash docker-deploy.sh
 
 # 查看日志 / View logs
 docker compose logs -f
@@ -239,7 +242,7 @@ docker compose down
 
 | 服务 Service | 镜像 Image | 端口 Port | 说明 Description |
 |-------------|-----------|-----------|------------------|
-| `app` | 自定义构建 | `3000` | Next.js 应用 |
+| `app` | 本地构建 `starkids-app:local` | `3000` | Next.js 应用 |
 | `db` | `postgres:17-alpine` | `5432` | PostgreSQL 数据库 |
 
 ### Dockerfile 特性 / Dockerfile Features

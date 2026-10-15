@@ -1,6 +1,12 @@
 services:
   app:
-    image: ghcr.io/panda-995/starkids:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DATABASE_URL: postgresql://starkids:starkids@db:5432/starkids
+        AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-random-secret-in-production}
+    image: starkids-app:local
     container_name: starkids-app
     restart: unless-stopped
     ports:
