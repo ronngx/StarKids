@@ -167,7 +167,7 @@ export default function AdminFamilyPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-warm-800">👨‍👩‍👧‍👦 家庭成员</h1>
           <p className="text-sm text-warm-400 mt-1">
@@ -249,7 +249,7 @@ export default function AdminFamilyPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-card p-5 flex items-center justify-between">
+      <div className="bg-white rounded-xl shadow-card p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs text-warm-400 uppercase tracking-wide">邀请码</p>
           <p className="font-mono text-xl font-bold text-admin-primary tracking-widest mt-0.5">
@@ -275,10 +275,10 @@ export default function AdminFamilyPage() {
           <div className="space-y-2">
             {parents.map((m) => (
               <div key={m.id} className="bg-white rounded-xl shadow-card p-4 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-2xl">
+                <div className="w-12 h-12 shrink-0 rounded-full bg-blue-50 flex items-center justify-center text-2xl">
                   👑
                 </div>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold text-sm text-warm-700">{m.nickname}</p>
                   <p className="text-xs text-warm-400">
                     加入于 {new Date(m.createdAt).toLocaleDateString("zh-CN")}
@@ -296,10 +296,10 @@ export default function AdminFamilyPage() {
           <div className="space-y-2">
             {kids.map((m) => (
               <div key={m.id} className="bg-white rounded-xl shadow-card p-4 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center text-2xl">
+                <div className="w-12 h-12 shrink-0 rounded-full bg-brand-50 flex items-center justify-center text-2xl">
                   {m.pet?.species ? SPECIES_EMOJI[m.pet.species] || "🌟" : "🌟"}
                 </div>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold text-sm text-warm-700">{m.nickname}</p>
                   <p className="text-xs text-warm-400">
                     {m.pet

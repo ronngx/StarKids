@@ -88,7 +88,7 @@ export default function AdminPointsPage() {
         )}
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-warm-50 rounded-xl">
+          <div className="flex flex-col gap-3 p-4 bg-warm-50 rounded-xl sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="font-semibold text-warm-800">周末双倍积分</h3>
               <p className="text-sm text-warm-400 mt-0.5">周六、日完成任务获得双倍积分</p>
@@ -105,7 +105,7 @@ export default function AdminPointsPage() {
             </label>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-warm-50 rounded-xl">
+          <div className="flex flex-col gap-3 p-4 bg-warm-50 rounded-xl sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="font-semibold text-warm-800">生日三倍积分</h3>
               <p className="text-sm text-warm-400 mt-0.5">小朋友生日当天完成任务获得三倍积分</p>
@@ -122,7 +122,7 @@ export default function AdminPointsPage() {
             </label>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-warm-50 rounded-xl">
+          <div className="flex flex-col gap-3 p-4 bg-warm-50 rounded-xl sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="font-semibold text-warm-800">积分重置模式</h3>
               <p className="text-sm text-warm-400 mt-0.5">积分清零周期设置</p>

@@ -109,7 +109,7 @@ export default function AdminShopPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-warm-800">🛒 积分商城</h1>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
@@ -235,16 +235,16 @@ export default function AdminShopPage() {
             </div>
           ) : (
             pendingRedemptions.map((r) => (
-              <div key={r.id} className="bg-white rounded-xl shadow-card p-4 flex items-center gap-4">
-                <div className="text-3xl">🎁</div>
-                <div className="flex-1">
+              <div key={r.id} className="bg-white rounded-xl shadow-card p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="text-3xl shrink-0">🎁</div>
+                <div className="min-w-0 flex-1">
                   <h3 className="font-semibold text-warm-800">{r.reward.name}</h3>
                   <p className="text-sm text-warm-400">
                     {r.member.nickname} · {r.pointsSpent}⭐
                     {r.kidMessage && ` · "${r.kidMessage}"`}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 sm:shrink-0">
                   <button onClick={() => handleApprove(r.id)} className="h-9 px-4 bg-candy-green text-white rounded-xl text-sm font-semibold hover:brightness-110">✅ 通过</button>
                   <button onClick={() => handleReject(r.id)} className="h-9 px-4 bg-candy-red/10 text-candy-red rounded-xl text-sm font-semibold hover:bg-candy-red/20">❌ 拒绝</button>
                 </div>

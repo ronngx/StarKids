@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { signOut } from "next-auth/react"
 
@@ -34,9 +35,46 @@ const adminNavItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Closing the drawer after navigation keeps the new page fully visible on mobile.
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
 
   return (
-    <aside className="fixed top-0 left-0 z-40 w-64 h-screen bg-white border-r border-warm-200 flex flex-col">
+    <>
+      <div className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between border-b border-warm-200 bg-white px-4 md:hidden">
+        <Link href="/admin" className="flex items-center gap-2" aria-label="返回管理仪表盘">
+          <span className="text-2xl">🌟</span>
+          <span className="font-kids text-xl text-candy-purple">StarKids</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setMobileOpen((open) => !open)}
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-xl text-warm-600 hover:bg-warm-100"
+          aria-label={mobileOpen ? "关闭管理菜单" : "打开管理菜单"}
+          aria-expanded={mobileOpen}
+        >
+          {mobileOpen ? "✕" : "☰"}
+        </button>
+      </div>
+
+      {mobileOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/30 md:hidden"
+          aria-label="关闭管理菜单"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      <aside
+        className={cn(
+          "fixed top-0 left-0 z-50 flex h-screen w-64 flex-col border-r border-warm-200 bg-white transition-transform duration-200",
+          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}
+      >
       <div className="h-16 flex items-center px-6 border-b border-warm-200">
         <Link href="/admin" className="flex items-center gap-2">
           <span className="text-2xl">🌟</span>
@@ -91,6 +129,7 @@ export function AdminSidebar() {
           <span>退出登录</span>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }
