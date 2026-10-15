@@ -172,33 +172,33 @@ async function setupTestData() {
   const parentHash = await bcrypt.hash("test123456", 12)
   const parentUser = await prisma.user.create({
     data: {
-      email: `test_parent_${timestamp}@test.com`,
+      username: `test_parent_${timestamp}`,
       name: "测试家长",
       passwordHash: parentHash,
       role: "PARENT",
     },
   })
   testIds.parentUserId = parentUser.id
-  console.log(`  ✅ 创建测试家长: ${parentUser.email}`)
+  console.log(`  ✅ 创建测试家长: ${parentUser.username}`)
 
   // 创建测试小朋友用户
   const kidHash = await bcrypt.hash("test123456", 12)
   const kidUser = await prisma.user.create({
     data: {
-      email: `test_kid_${timestamp}@test.com`,
+      username: `test_kid_${timestamp}`,
       name: "测试小朋友",
       passwordHash: kidHash,
       role: "KID",
     },
   })
   testIds.kidUserId = kidUser.id
-  console.log(`  ✅ 创建测试小朋友: ${kidUser.email}`)
+  console.log(`  ✅ 创建测试小朋友: ${kidUser.username}`)
 
   // 创建第二个小朋友
   const kid2Hash = await bcrypt.hash("test123456", 12)
   const kid2User = await prisma.user.create({
     data: {
-      email: `test_kid2_${timestamp}@test.com`,
+      username: `test_kid2_${timestamp}`,
       name: "测试小朋友2",
       passwordHash: kid2Hash,
       role: "KID",

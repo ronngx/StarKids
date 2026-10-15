@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import bcrypt from "bcryptjs"
 import type { MemberRole } from "@prisma/client"
+import { Prisma } from "@prisma/client"
+import { memberUpdateSchema, registrationSchema } from "@/lib/credentials"
 
 function generateInviteCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -109,37 +111,92 @@ export async function addKidToFamily(formData: FormData) {
     throw new Error("只有家长可以添加小朋友")
   }
 
-  const nickname = (formData.get("nickname") as string).trim()
-  const email = (formData.get("email") as string).trim()
-  const password = (formData.get("password") as string).trim()
+  const parsed = registrationSchema.safeParse({
+    nickname: formData.get("nickname"),
+    username: formData.get("username"),
+    password: formData.get("password"),
+    role: "KID",
+  })
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message)
+  const { nickname, username, password } = parsed.data
 
-  if (!nickname || nickname.length < 2) throw new Error("昵称至少2个字符")
-  if (!email) throw new Error("请输入小朋友的邮箱")
-  if (!password || password.length < 6) throw new Error("密码至少6位")
-
-  const existingUser = await prisma.user.findUnique({ where: { email } })
-  if (existingUser) throw new Error("该邮箱已被注册")
+  const existingUser = await prisma.user.findUnique({ where: { username } })
+  if (existingUser) throw new Error("该用户名已被使用")
 
   const hash = await bcrypt.hash(password, 12)
 
-  const user = await prisma.user.create({
-    data: {
-      email,
-      name: nickname,
-      passwordHash: hash,
-      role: "KID" as MemberRole,
-    },
-  })
-
-  await prisma.familyMember.create({
-    data: {
-      familyId: currentMember.familyId,
-      userId: user.id,
-      role: "KID" as MemberRole,
-      nickname,
-    },
-  })
+  try {
+    await prisma.user.create({
+      data: {
+        username,
+        name: nickname,
+        passwordHash: hash,
+        role: "KID",
+        familyMembers: {
+          create: { familyId: currentMember.familyId, role: "KID", nickname },
+        },
+      },
+    })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new Error("该用户名已被使用")
+    }
+    throw error
+  }
 
   revalidatePath("/admin/family")
   return { success: true, kidNickname: nickname }
+}
+
+export async function updateFamilyMember(formData: FormData) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error("请先登录")
+
+  const currentMember = await prisma.familyMember.findFirst({
+    where: { userId: session.user.id },
+  })
+  if (!currentMember || currentMember.role !== "PARENT") {
+    throw new Error("只有家长可以修改家庭成员")
+  }
+
+  const memberId = formData.get("memberId")
+  if (typeof memberId !== "string" || !memberId) throw new Error("请选择要修改的成员")
+  const member = await prisma.familyMember.findFirst({
+    where: { id: memberId, familyId: currentMember.familyId },
+  })
+  if (!member) throw new Error("该成员不在当前家庭中")
+
+  const parsed = memberUpdateSchema.safeParse({
+    nickname: formData.get("nickname"),
+    username: formData.get("username"),
+    password: formData.get("password") ?? "",
+  })
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message)
+  const { nickname, username, password } = parsed.data
+
+  const existingUser = await prisma.user.findUnique({ where: { username } })
+  if (existingUser && existingUser.id !== member.userId) throw new Error("该用户名已被使用")
+
+  const passwordHash = password ? await bcrypt.hash(password, 12) : undefined
+  try {
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: member.userId },
+        data: { username, name: nickname, ...(passwordHash ? { passwordHash } : {}) },
+      }),
+      prisma.familyMember.update({
+        where: { id: member.id },
+        data: { nickname },
+      }),
+    ])
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new Error("该用户名已被使用")
+    }
+    throw error
+  }
+
+  revalidatePath("/admin", "layout")
+  revalidatePath("/kids", "layout")
+  return { success: true, nickname }
 }

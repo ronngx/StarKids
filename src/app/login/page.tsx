@@ -3,15 +3,13 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { credentialsSchema } from "@/lib/credentials"
 import { signIn, getSession } from "next-auth/react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
-const loginSchema = z.object({
-  email: z.string().email("请输入有效的邮箱地址"),
-  password: z.string().min(6, "密码至少6位"),
-})
+const loginSchema = credentialsSchema
 
 type LoginValues = z.infer<typeof loginSchema>
 
@@ -34,20 +32,20 @@ export default function LoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        email: data.email,
+        username: data.username,
         password: data.password,
         redirect: false,
       })
 
       if (result?.error) {
-        setError(result.error === "CredentialsSignin" ? "邮箱或密码不正确" : result.error)
+        setError(result.error === "CredentialsSignin" ? "用户名或密码不正确" : result.error)
         setIsLoading(false)
         return
       }
 
       const session = await getSession()
       const role = session?.user?.role
-      if (role === "PARENT") {
+      if (role === "PARENT" || role === "ADMIN") {
         router.push("/admin")
       } else {
         router.push("/kids")
@@ -68,7 +66,7 @@ export default function LoginPage() {
             欢迎回来
           </h1>
           <p className="text-warm-400">
-            输入邮箱和密码登录
+            输入用户名和密码登录
           </p>
         </div>
 
@@ -84,23 +82,25 @@ export default function LoginPage() {
 
           <div>
             <label
-              htmlFor="email"
+              htmlFor="username"
               className="block text-sm font-medium text-warm-600 mb-1.5"
             >
-              电子邮箱
+              用户名
             </label>
             <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="hello@example.com"
-              {...register("email")}
+              id="username"
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="如：爸爸、xiaoming"
+              {...register("username")}
               className="w-full h-12 px-4 rounded-xl border-2 border-warm-200 bg-warm-50 
                 text-warm-700 text-base placeholder:text-warm-400
                 focus:border-candy-blue focus:bg-white focus:outline-none transition-colors"
             />
-            {errors.email && (
-              <p className="text-candy-red text-xs mt-1.5">{errors.email.message}</p>
+            {errors.username && (
+              <p className="text-candy-red text-xs mt-1.5">{errors.username.message}</p>
             )}
           </div>
 

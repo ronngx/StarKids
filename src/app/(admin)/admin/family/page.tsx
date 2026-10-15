@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
+import { useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
 import { SPECIES_EMOJI, STAGE_LABELS } from "@/lib/constants"
 import { CardSkeleton } from "@/components/ui/Skeleton"
@@ -10,12 +10,14 @@ import { useToast } from "@/components/ui/ToastProvider"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { memberUpdateSchema, usernameSchema, passwordSchema } from "@/lib/credentials"
 
 type FamilyMember = {
   id: string
-  nickname: string
+  nickname: string | null
   role: string
   userId: string
+  user: { username: string }
   createdAt: string
   currentPoints: number
   pet: { name: string; species: string; stage: string } | null
@@ -25,24 +27,85 @@ type FamilyData = {
   name: string
   inviteCode: string
   createdAt: string
+  canManageMembers: boolean
   members: FamilyMember[]
-}
-
-const ROLE_LABELS: Record<string, string> = {
-  PARENT: "👑 家长",
-  KID: "🌟 小朋友",
 }
 
 const addKidSchema = z.object({
   nickname: z.string().min(2, "昵称至少2个字符"),
-  email: z.string().email("请输入有效的邮箱地址"),
-  password: z.string().min(6, "密码至少6位"),
+  username: usernameSchema,
+  password: passwordSchema,
 })
 
 type AddKidValues = z.infer<typeof addKidSchema>
 
+const editMemberSchema = memberUpdateSchema.extend({
+  confirmPassword: z.string(),
+}).refine((values) => values.password === values.confirmPassword, {
+  message: "两次输入的密码不一致",
+  path: ["confirmPassword"],
+})
+type EditMemberValues = z.infer<typeof editMemberSchema>
+
+function MemberEditForm({ member, saving, onCancel, onSave }: {
+  member: FamilyMember
+  saving: boolean
+  onCancel: () => void
+  onSave: (values: EditMemberValues) => Promise<void>
+}) {
+  const { register, handleSubmit, formState: { errors } } = useForm<EditMemberValues>({
+    resolver: zodResolver(editMemberSchema),
+    defaultValues: {
+      nickname: member.nickname ?? "",
+      username: member.user.username,
+      password: "",
+      confirmPassword: "",
+    },
+  })
+  const fields = [
+    { name: "nickname", label: "昵称", type: "text", placeholder: "至少2个字符", autoComplete: "off" },
+    { name: "username", label: "用户名", type: "text", placeholder: "用于登录的用户名", autoComplete: "username" },
+    { name: "password", label: "新密码（选填）", type: "password", placeholder: "留空保留原密码，修改时至少6位", autoComplete: "new-password" },
+    { name: "confirmPassword", label: "确认新密码", type: "password", placeholder: "修改密码时请再次输入", autoComplete: "new-password" },
+  ] as const
+
+  return (
+    <form onSubmit={handleSubmit(onSave)} className="border-t border-warm-100 mt-4 pt-4" aria-label={`编辑${member.nickname || member.user.username}`}>
+      <h3 className="text-sm font-semibold text-warm-700 mb-2">编辑成员</h3>
+      <p className="text-xs text-warm-500 mb-4">用户名用于登录。新密码留空则保留原密码。</p>
+      <fieldset disabled={saving} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {fields.map((field) => (
+            <div key={field.name} className="min-w-0">
+              <label htmlFor={`${member.id}-${field.name}`} className="block text-sm font-medium text-warm-600 mb-1">{field.label}</label>
+              <input
+                {...register(field.name)}
+                id={`${member.id}-${field.name}`}
+                type={field.type}
+                autoComplete={field.autoComplete}
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder={field.placeholder}
+                aria-invalid={!!errors[field.name]}
+                aria-describedby={errors[field.name] ? `${member.id}-${field.name}-error` : undefined}
+                className="w-full h-11 px-3 rounded-xl border border-warm-200 bg-warm-50 text-warm-700 text-base sm:text-sm focus:border-admin-primary focus:outline-none disabled:opacity-60"
+              />
+              {errors[field.name] && <p id={`${member.id}-${field.name}-error`} className="text-candy-red text-xs mt-1" role="alert">{errors[field.name]?.message}</p>}
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 sm:justify-end">
+          <button type="button" onClick={onCancel} className="flex-1 sm:flex-none h-11 px-5 rounded-xl border border-warm-200 text-warm-600 text-sm font-semibold hover:bg-warm-100 disabled:opacity-50">取消</button>
+          <button type="submit" className="flex-1 sm:flex-none h-11 px-5 rounded-xl bg-admin-primary text-white text-sm font-semibold hover:brightness-110 disabled:opacity-50">{saving ? "保存中..." : "保存修改"}</button>
+        </div>
+      </fieldset>
+    </form>
+  )
+}
+
 export default function AdminFamilyPage() {
   const router = useRouter()
+  const { data: session, update: updateSession } = useSession()
   const { toast } = useToast()
   const [data, setData] = useState<FamilyData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -50,6 +113,8 @@ export default function AdminFamilyPage() {
   const [copied, setCopied] = useState(false)
   const [showAddKid, setShowAddKid] = useState(false)
   const [addingKid, setAddingKid] = useState(false)
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
+  const [savingMember, setSavingMember] = useState(false)
 
   const {
     register,
@@ -96,7 +161,7 @@ export default function AdminFamilyPage() {
     try {
       const fd = new FormData()
       fd.append("nickname", values.nickname)
-      fd.append("email", values.email)
+      fd.append("username", values.username)
       fd.append("password", values.password)
 
       const res = await fetch("/api/family/add-kid", {
@@ -118,6 +183,72 @@ export default function AdminFamilyPage() {
     } finally {
       setAddingKid(false)
     }
+  }
+
+  async function onSaveMember(member: FamilyMember, values: EditMemberValues) {
+    setSavingMember(true)
+    try {
+      const fd = new FormData()
+      fd.set("memberId", member.id)
+      fd.set("nickname", values.nickname)
+      fd.set("username", values.username)
+      fd.set("password", values.password)
+      const res = await fetch("/api/family/members", { method: "PATCH", body: fd })
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        toast(json.error || "修改失败", "error")
+        return
+      }
+      toast(`成员「${json.nickname}」已更新`, "success")
+      setEditingMemberId(null)
+      await fetchData()
+      if (member.userId === session?.user?.id) {
+        await updateSession({}).catch(() => undefined)
+      }
+      router.refresh()
+    } catch {
+      toast("网络错误，请稍后重试", "error")
+    } finally {
+      setSavingMember(false)
+    }
+  }
+
+  function renderMember(member: FamilyMember) {
+    const isKid = member.role === "KID"
+    const editing = editingMemberId === member.id
+    return (
+      <div key={member.id} className="bg-white rounded-xl shadow-card p-4">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+          <div className={cn("w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-2xl", isKid ? "bg-brand-50" : "bg-blue-50")}>
+            {isKid ? (member.pet?.species ? SPECIES_EMOJI[member.pet.species] || "🌟" : "🌟") : "👑"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-sm text-warm-700 break-all">{member.nickname || member.user.username}</p>
+            <p className="text-xs text-warm-500 break-all">用户名：{member.user.username}</p>
+            <p className="text-xs text-warm-400">
+              {isKid ? (member.pet ? `${member.pet.name} · ${STAGE_LABELS[member.pet.stage] || member.pet.stage}` : "暂无宠物") : `加入于 ${new Date(member.createdAt).toLocaleDateString("zh-CN")}`}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-3 w-full sm:w-auto">
+            {isKid && <div className="text-right">
+              <p className="text-sm font-kids text-candy-orange">{member.currentPoints || 0}⭐</p>
+              <p className="text-xs text-warm-400">当前积分</p>
+            </div>}
+            {data?.canManageMembers && <button
+              type="button"
+              disabled={savingMember}
+              aria-expanded={editing}
+              aria-controls={`edit-member-${member.id}`}
+              onClick={() => setEditingMemberId(editing ? null : member.id)}
+              className="h-10 px-4 rounded-xl border border-warm-200 text-admin-primary text-sm font-semibold hover:bg-warm-50 disabled:opacity-50"
+            >{editing ? "收起" : "编辑"}</button>}
+          </div>
+        </div>
+        {editing && <div id={`edit-member-${member.id}`}>
+          <MemberEditForm member={member} saving={savingMember} onCancel={() => setEditingMemberId(null)} onSave={(values) => onSaveMember(member, values)} />
+        </div>}
+      </div>
+    )
   }
 
   if (loading) {
@@ -174,13 +305,13 @@ export default function AdminFamilyPage() {
             {data.name} · {data.members.length} 位成员
           </p>
         </div>
-        <button
+        {data.canManageMembers && <button
           onClick={() => setShowAddKid(true)}
           className="flex items-center gap-2 h-10 px-4 bg-candy-green text-white font-semibold text-sm rounded-xl hover:brightness-110 transition-all"
         >
           <span>➕</span>
           <span>添加小朋友</span>
-        </button>
+        </button>}
       </div>
 
       {showAddKid && (
@@ -209,14 +340,17 @@ export default function AdminFamilyPage() {
                 {errors.nickname && <p className="text-candy-red text-xs mt-1">{errors.nickname.message}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-warm-600 mb-1">电子邮箱</label>
+                <label className="block text-sm font-medium text-warm-600 mb-1">用户名</label>
                 <input
-                  type="email"
-                  {...register("email")}
-                  placeholder="小朋友的登录邮箱"
+                  type="text"
+                  {...register("username")}
+                  placeholder="如：朵朵、duoduo"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   className="w-full h-11 px-3 rounded-xl border border-warm-200 bg-warm-50 text-warm-700 text-sm focus:border-candy-green focus:outline-none"
                 />
-                {errors.email && <p className="text-candy-red text-xs mt-1">{errors.email.message}</p>}
+                {errors.username && <p className="text-candy-red text-xs mt-1">{errors.username.message}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-warm-600 mb-1">登录密码</label>
@@ -273,19 +407,7 @@ export default function AdminFamilyPage() {
         <div>
           <h2 className="font-semibold text-warm-700 mb-3">👑 家长 ({parents.length})</h2>
           <div className="space-y-2">
-            {parents.map((m) => (
-              <div key={m.id} className="bg-white rounded-xl shadow-card p-4 flex items-center gap-4">
-                <div className="w-12 h-12 shrink-0 rounded-full bg-blue-50 flex items-center justify-center text-2xl">
-                  👑
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-sm text-warm-700">{m.nickname}</p>
-                  <p className="text-xs text-warm-400">
-                    加入于 {new Date(m.createdAt).toLocaleDateString("zh-CN")}
-                  </p>
-                </div>
-              </div>
-            ))}
+            {parents.map(renderMember)}
           </div>
         </div>
       )}
@@ -294,27 +416,7 @@ export default function AdminFamilyPage() {
         <div>
           <h2 className="font-semibold text-warm-700 mb-3">🌟 小朋友 ({kids.length})</h2>
           <div className="space-y-2">
-            {kids.map((m) => (
-              <div key={m.id} className="bg-white rounded-xl shadow-card p-4 flex items-center gap-4">
-                <div className="w-12 h-12 shrink-0 rounded-full bg-brand-50 flex items-center justify-center text-2xl">
-                  {m.pet?.species ? SPECIES_EMOJI[m.pet.species] || "🌟" : "🌟"}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-sm text-warm-700">{m.nickname}</p>
-                  <p className="text-xs text-warm-400">
-                    {m.pet
-                      ? `${m.pet.name} · ${STAGE_LABELS[m.pet.stage] || m.pet.stage}`
-                      : "暂无宠物"}
-                    {" · "}
-                    <span className="text-brand-500">{m.currentPoints}⭐</span>
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-kids text-candy-orange">{m.currentPoints || 0}⭐</p>
-                  <p className="text-xs text-warm-400">当前积分</p>
-                </div>
-              </div>
-            ))}
+            {kids.map(renderMember)}
           </div>
         </div>
       )}

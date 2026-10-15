@@ -80,7 +80,7 @@
 
 ### 👨‍👩‍👧‍👦 家庭管理 / Family Management
 - **邀请码机制**：通过邀请码加入家庭
-- **成员管理**：添加/管理家庭成员
+- **成员管理**：添加小朋友；家长可在成员条目下方编辑自己及同一家庭成员的昵称、登录用户名，并按需重设密码（新密码留空则保留原密码）
 - **角色区分**：家长与小朋友不同权限
 
 ### 🔔 通知系统 / Notifications
@@ -251,6 +251,23 @@ docker compose down
 - **PostgreSQL 适配**：构建时自动切换数据库 Provider
 - **健康检查**：数据库就绪后才启动应用
 - **非 root 用户**：以 `nextjs` 用户运行，提升安全性
+- **增量构建缓存**：使用 BuildKit 持久保存 npm 下载缓存和 Next.js 编译缓存，源码更新后可继续复用
+- **本地字体**：随项目托管 Noto Sans SC 和 ZCOOL KuaiLe，构建无需下载 Google 字体；保留按字形范围加载和原字体许可
+- **独立 Prisma 缓存层**：只在 Prisma 文件或依赖变化时重新生成 Client，普通页面修改会跳过该步骤
+- **复用依赖安装**：生产依赖从完整依赖中裁剪，避免重复安装并编译原生模块
+- **运行时认证配置**：`AUTH_SECRET` 和数据库连接只在运行时注入实际值，修改这些配置不会触发应用重新编译
+
+构建需要支持 BuildKit 的 Docker / Docker Compose V2。更新 Dockerfile 后首次构建会重新准备依赖和缓存，后续页面修改才会受益；Next.js 仍会执行生产构建、类型检查和页面生成。
+
+```bash
+# 显示每个构建步骤，便于确认缓存命中和耗时
+docker compose --progress=plain build app
+
+# 使用已构建的镜像启动服务
+docker compose up -d --no-build
+```
+
+缓存保存在当前 Docker builder 中，换机器或清理 builder 缓存后需要重新建立。日常更新请保留构建缓存，避免使用 `--no-cache` 或执行 `docker builder prune`。字体资源和许可位于 `public/fonts`，更新字体时需同步更新 `src/app/fonts.css` 中的引用。
 
 ---
 
@@ -298,6 +315,22 @@ DATABASE_URL="postgresql://starkids:starkids@db:5432/starkids"
 
 ### 认证 / Authentication
 
+账号使用 **用户名 + 密码**，注册和家长添加小朋友均不需要邮箱或邮件服务。用户名支持中文、字母、数字、下划线、短横线和点，长度为 2–64 个字符；首尾空格会移除，英文字母统一为小写。用户名在整个系统内唯一，昵称可重复。密码至少 6 位。
+
+从旧版升级时，Docker 启动会自动应用数据库迁移：原邮箱 `@` 前的名称会转换为用户名，例如 `Dad@example.com` 转为 `dad`。如果该名称重名、不符合规则或以 `legacy_` 开头，会转换为 `legacy_用户ID`。用户 ID、原密码、家庭、任务和积分均保留。家长可以在“家庭成员”页面查看各成员的登录用户名。需要核对迁移后的账号时可执行：
+
+```bash
+docker compose exec db psql -U starkids -d starkids -c 'SELECT username, name FROM users ORDER BY "createdAt";'
+```
+
+本地 SQLite 已有旧账号时，先运行下面的迁移命令，再运行 `npm run db:push`。新安装直接运行 `npm run db:push`。
+
+```bash
+npm run db:migrate-usernames:sqlite
+# 数据库不在默认 dev.db 时，指定文件路径
+npm run db:migrate-usernames:sqlite -- /path/to/dev.db
+```
+
 | 方法 Method | 路径 Path | 说明 Description |
 |------------|----------|------------------|
 | `POST` | `/api/register` | 用户注册 / User registration |
@@ -317,6 +350,7 @@ DATABASE_URL="postgresql://starkids:starkids@db:5432/starkids"
 | `GET` | `/api/points/config` | 获取积分配置 / Get points config |
 | `POST` | `/api/points/config` | 更新积分配置 / Update points config |
 | `GET` | `/api/family/members` | 获取家庭成员 / Get family members |
+| `PATCH` | `/api/family/members` | 家长修改同一家庭成员的昵称、用户名及可选新密码（FormData：`memberId`、`nickname`、`username`、`password`） |
 | `POST` | `/api/family/add-kid` | 添加小朋友 / Add kid |
 | `GET` | `/api/notifications` | 获取通知 / Get notifications |
 
@@ -340,11 +374,6 @@ DATABASE_URL="postgresql://starkids:starkids@db:5432/starkids"
 | `AUTH_SECRET` | 认证密钥 / Auth secret | (必填 Required) |
 | `AUTH_URL` | 认证 URL / Auth URL | `http://localhost:3000` |
 | `NEXT_PUBLIC_APP_URL` | 应用 URL / App URL | `http://localhost:3000` |
-| `EMAIL_SERVER_HOST` | 邮件服务器 / Email host | — |
-| `EMAIL_SERVER_PORT` | 邮件端口 / Email port | — |
-| `EMAIL_SERVER_USER` | 邮件用户名 / Email user | — |
-| `EMAIL_SERVER_PASSWORD` | 邮件密码 / Email password | — |
-| `EMAIL_FROM` | 发件人 / From address | — |
 
 ---
 

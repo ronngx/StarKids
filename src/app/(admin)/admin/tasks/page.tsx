@@ -98,7 +98,7 @@ export default function AdminTasksPage() {
   function openEditForm(task: TaskData) {
     setEditId(task.id)
     setError("")
-    setShowCreateForm(true)
+    setShowCreateForm(false)
   }
 
   async function handleTaskSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -128,6 +128,10 @@ export default function AdminTasksPage() {
   async function handleDelete(id: string) {
     if (!confirm("确定要删除这个任务吗？")) return
     await deleteTask(id)
+    if (editId === id) {
+      setEditId(null)
+      setError("")
+    }
     fetchData()
     router.refresh()
   }
@@ -208,78 +212,90 @@ export default function AdminTasksPage() {
             </div>
           ) : (
             tasks.map((task) => (
-              <div
-                key={task.id}
-                className="bg-white rounded-xl shadow-card p-4 flex flex-col gap-4 sm:flex-row sm:items-start"
-              >
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <div className="text-3xl shrink-0" aria-hidden="true">{task.icon || "📌"}</div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold text-warm-800 truncate">{task.name}</h3>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-warm-100 text-warm-500">
-                        {CATEGORIES.find((c) => c.value === task.category)?.label || task.category}
-                      </span>
-                    </div>
-                    {task.description && (
-                      <p className="mt-1 text-sm text-warm-500 line-clamp-2">{task.description}</p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
-                      <span className="px-2 py-1 rounded-md bg-brand-50 text-brand-700">
-                        积分：+{task.points}⭐
-                      </span>
-                      <span className={cn(
-                        "px-2 py-1 rounded-md",
-                        DIFFICULTY_CONFIG[task.difficulty]?.className || "bg-warm-100 text-warm-600"
-                      )}>
-                        难度：{DIFFICULTY_CONFIG[task.difficulty]?.label || task.difficulty}
-                        {DIFFICULTY_CONFIG[task.difficulty]?.stars && (
-                          <span className="ml-1" aria-label={`${DIFFICULTY_CONFIG[task.difficulty].label}难度`}>
-                            {DIFFICULTY_CONFIG[task.difficulty].stars}
-                          </span>
+              <div key={task.id} className="space-y-3">
+                <div className="bg-white rounded-xl shadow-card p-4 flex flex-col gap-4 sm:flex-row sm:items-start">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="text-3xl shrink-0" aria-hidden="true">{task.icon || "📌"}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-warm-800 truncate">{task.name}</h3>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-warm-100 text-warm-500">
+                          {CATEGORIES.find((c) => c.value === task.category)?.label || task.category}
+                        </span>
+                      </div>
+                      {task.description && (
+                        <p className="mt-1 text-sm text-warm-500 line-clamp-2">{task.description}</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
+                        <span className="px-2 py-1 rounded-md bg-brand-50 text-brand-700">
+                          积分：+{task.points}⭐
+                        </span>
+                        <span className={cn(
+                          "px-2 py-1 rounded-md",
+                          DIFFICULTY_CONFIG[task.difficulty]?.className || "bg-warm-100 text-warm-600"
+                        )}>
+                          难度：{DIFFICULTY_CONFIG[task.difficulty]?.label || task.difficulty}
+                          {DIFFICULTY_CONFIG[task.difficulty]?.stars && (
+                            <span className="ml-1" aria-label={`${DIFFICULTY_CONFIG[task.difficulty].label}难度`}>
+                              {DIFFICULTY_CONFIG[task.difficulty].stars}
+                            </span>
+                          )}
+                        </span>
+                        <span className="px-2 py-1 rounded-md bg-warm-100 text-warm-600">
+                          类型：{TASK_TYPE_LABELS[task.type] || task.type}
+                        </span>
+                        <span className="px-2 py-1 rounded-md bg-warm-100 text-warm-600">
+                          频率：{TASK_FREQUENCY_LABELS[task.frequency] || task.frequency}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-warm-400">
+                        {task.autoApprove && <span className="text-candy-green">自动通过</span>}
+                        {task.assignees.length > 0 ? (
+                          <span>分配：{task.assignees.map((a) => a.nickname).join(", ")}</span>
+                        ) : (
+                          <span>分配：全员</span>
                         )}
-                      </span>
-                      <span className="px-2 py-1 rounded-md bg-warm-100 text-warm-600">
-                        类型：{TASK_TYPE_LABELS[task.type] || task.type}
-                      </span>
-                      <span className="px-2 py-1 rounded-md bg-warm-100 text-warm-600">
-                        频率：{TASK_FREQUENCY_LABELS[task.frequency] || task.frequency}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-warm-400">
-                      {task.autoApprove && <span className="text-candy-green">自动通过</span>}
-                      {task.assignees.length > 0 ? (
-                        <span>分配：{task.assignees.map((a) => a.nickname).join(", ")}</span>
-                      ) : (
-                        <span>分配：全员</span>
-                      )}
-                      {task.completions.length > 0 && (
-                        <span>今日完成：{task.completions.filter((completion) => completion.status === "APPROVED").length} 人</span>
-                      )}
+                        {task.completions.length > 0 && (
+                          <span>今日完成：{task.completions.filter((completion) => completion.status === "APPROVED").length} 人</span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  <div className="flex gap-2 self-end sm:self-start shrink-0">
+                    <button
+                      onClick={() => openEditForm(task)}
+                      className="h-8 px-3 border border-warm-200 rounded-lg text-xs text-warm-500 hover:border-admin-primary hover:text-admin-primary transition-colors"
+                    >
+                      编辑
+                    </button>
+                    <AssignDialog
+                      taskId={task.id}
+                      onAssign={() => {
+                        fetchData()
+                        router.refresh()
+                      }}
+                    />
+                    <button
+                      onClick={() => handleDelete(task.id)}
+                      className="h-8 w-8 flex items-center justify-center rounded-lg text-warm-400 hover:bg-candy-red/10 hover:text-candy-red transition-colors"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2 self-end sm:self-start shrink-0">
-                  <button
-                    onClick={() => openEditForm(task)}
-                    className="h-8 px-3 border border-warm-200 rounded-lg text-xs text-warm-500 hover:border-admin-primary hover:text-admin-primary transition-colors"
-                  >
-                    编辑
-                  </button>
-                  <AssignDialog
-                    taskId={task.id}
-                    onAssign={() => {
-                      fetchData()
-                      router.refresh()
+
+                {editId === task.id && (
+                  <TaskForm
+                    key={editId}
+                    task={task}
+                    onSubmit={handleTaskSubmit}
+                    onCancel={() => {
+                      setEditId(null)
+                      setError("")
                     }}
+                    error={error}
                   />
-                  <button
-                    onClick={() => handleDelete(task.id)}
-                    className="h-8 w-8 flex items-center justify-center rounded-lg text-warm-400 hover:bg-candy-red/10 hover:text-candy-red transition-colors"
-                  >
-                    🗑️
-                  </button>
-                </div>
+                )}
               </div>
             ))
           )}

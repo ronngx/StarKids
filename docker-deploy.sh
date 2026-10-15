@@ -7,8 +7,11 @@ echo " 模式: 本地构建"
 echo "============================================"
 echo ""
 
-echo "构建并启动服务..."
-docker compose up -d --build
+echo "构建应用镜像（复用依赖和 Next.js 缓存）..."
+docker compose --progress=plain build app
+
+echo "启动服务..."
+docker compose up -d --no-build
 
 echo ""
 echo "============================================"

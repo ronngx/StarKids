@@ -12,8 +12,9 @@ LICENSE
 node_modules
 .next
 .env
-.env.local
-.env.*.local
+.env.*
+*.tsbuildinfo
+.trae
 *.db
 *.db-journal
 coverage

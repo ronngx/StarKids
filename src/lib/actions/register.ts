@@ -2,43 +2,34 @@
 
 import { prisma } from "@/lib/db"
 import bcrypt from "bcryptjs"
-import type { UserAccountRole } from "@prisma/client"
+import { Prisma } from "@prisma/client"
+import { registrationSchema } from "@/lib/credentials"
 
 export async function registerUser(formData: FormData) {
-  const email = (formData.get("email") as string).toLowerCase().trim()
-  const password = formData.get("password") as string
-  const nickname = (formData.get("nickname") as string).trim()
-  const role = (formData.get("role") as string) || "PARENT"
+  const parsed = registrationSchema.safeParse({
+    username: formData.get("username"),
+    password: formData.get("password"),
+    nickname: formData.get("nickname"),
+    role: formData.get("role") || "PARENT",
+  })
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message)
+  const { username, password, nickname, role } = parsed.data
 
-  if (!email || !password || !nickname) {
-    throw new Error("请填写所有必填字段")
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new Error("邮箱格式不正确")
-  }
-
-  if (password.length < 6) {
-    throw new Error("密码至少6位")
-  }
-
-  if (role !== "PARENT" && role !== "KID") {
-    throw new Error("无效的角色选择")
-  }
-
-  const existing = await prisma.user.findUnique({ where: { email } })
+  const existing = await prisma.user.findUnique({ where: { username } })
   if (existing) {
-    throw new Error("该邮箱已被注册")
+    throw new Error("该用户名已被使用")
   }
 
   const hash = await bcrypt.hash(password, 12)
 
-  await prisma.user.create({
-    data: {
-      email,
-      name: nickname,
-      passwordHash: hash,
-      role: role as UserAccountRole,
-    },
-  })
+  try {
+    await prisma.user.create({
+      data: { username, name: nickname, passwordHash: hash, role },
+    })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new Error("该用户名已被使用")
+    }
+    throw error
+  }
 }

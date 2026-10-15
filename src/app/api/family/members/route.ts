@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { updateFamilyMember } from "@/lib/actions/family"
 
 export async function GET() {
   const session = await auth()
@@ -23,6 +24,7 @@ export async function GET() {
       nickname: true,
       role: true,
       userId: true,
+      user: { select: { username: true } },
       createdAt: true,
       currentPoints: true,
       pet: {
@@ -36,6 +38,16 @@ export async function GET() {
     name: family?.name || "",
     inviteCode: family?.inviteCode || "",
     createdAt: family?.createdAt || "",
+    canManageMembers: currentMember.role === "PARENT",
     members,
   })
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const result = await updateFamilyMember(await request.formData())
+    return NextResponse.json(result)
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "修改失败" }, { status: 400 })
+  }
 }

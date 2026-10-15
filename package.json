@@ -9,6 +9,7 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:migrate-usernames:sqlite": "node scripts/migrate-usernames-sqlite.cjs",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio"
   },

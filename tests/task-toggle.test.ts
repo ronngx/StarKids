@@ -20,6 +20,7 @@ let actions: typeof import("../src/lib/actions/tasks")
 let taskId: string
 
 before(async () => {
+  writeFileSync(path.join(testDir, "test.db"), "")
   // Use the real schema and business logic; replace only request authentication and cache APIs.
   const configPath = path.join(testDir, "prisma.config.ts")
   writeFileSync(configPath, `import { defineConfig } from "prisma/config"
@@ -65,7 +66,7 @@ beforeEach(async () => {
   state.userId = "kid"
   state.revalidated.length = 0
   for (const id of ["kid", "parent", "other-kid"]) {
-    await db.user.create({ data: { id, email: `${id}@test.invalid`, role: id === "parent" ? "PARENT" : "KID" } })
+    await db.user.create({ data: { id, username: id, role: id === "parent" ? "PARENT" : "KID" } })
   }
   await db.family.create({
     data: {

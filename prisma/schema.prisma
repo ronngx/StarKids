@@ -204,8 +204,7 @@ enum SkinType {
 // ──────────────────────────────────────────────────────────────────────────────
 model User {
   id            String   @id @default(uuid())
-  email         String   @unique
-  emailVerified DateTime?
+  username      String   @unique                // 登录用户名，英文字母统一小写
   name          String?                         // 显示名称
   passwordHash  String?                         // 密码哈希 (备用)
   role          UserAccountRole @default(PARENT)

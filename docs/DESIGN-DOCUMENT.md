@@ -885,7 +885,7 @@ model FamilyMember {
 
 model User {
   id            String    @id @default(uuid())
-  email         String    @unique
+  username      String    @unique
   name          String?
   passwordHash  String?
   role          UserRole  @default(PARENT)
@@ -1175,7 +1175,7 @@ enum NotifType {
 | **数据库** | PostgreSQL 16 + Prisma 6 | 主存储 |
 | **缓存** | Redis (Upstash) | 通知 + 会话 |
 | **文件上传** | UploadThing / Cloudflare R2 | 图片存储 |
-| **认证** | Auth.js v5 (Magic Link) | 邮箱登录 |
+| **认证** | Auth.js v5 (Credentials) | 用户名 + 密码登录 |
 | **部署** | Vercel + Neon (PostgreSQL) | 全托管 |
 | **推送** | Web Push API / 微信模板消息 | 通知推送 |
 | **动画库** | Framer Motion + Lottie | 丰富动效 |
@@ -1250,7 +1250,7 @@ enum NotifType {
 - [ ] 项目 CI/CD 配置
 
 #### Phase 1: 认证 + 家庭 (W2-W3)
-- [ ] 邮箱 Magic Link 登录
+- [ ] 用户名 + 密码登录
 - [ ] 创建家庭 + 邀请成员
 - [ ] 家长/小朋友角色切换
 - [ ] 小朋友档案 (头像/昵称/年龄)
@@ -1356,7 +1356,7 @@ enum NotifType {
 
 | 页面 | 路由 | 说明 |
 |---|---|---|
-| 登录页 | `/admin/login` | 邮箱登录 |
+| 登录页 | `/admin/login` | 用户名 + 密码登录 |
 | 仪表盘 | `/admin` | 数据概览 + 待办 |
 | 任务管理 | `/admin/tasks` | 任务 CRUD |
 | 新建任务 | `/admin/tasks/new` | 创建任务 |

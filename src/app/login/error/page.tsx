@@ -9,7 +9,7 @@ export default function ErrorPage() {
           登录出错了
         </h1>
         <p className="text-warm-500">
-          登录过程中发生了错误，请检查邮箱和密码后重试
+          登录过程中发生了错误，请检查用户名和密码后重试
         </p>
 
         <Link

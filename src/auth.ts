@@ -2,19 +2,7 @@ import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
-import type { DefaultSession } from "next-auth"
-
-declare module "next-auth" {
-  interface User {
-    role: string
-  }
-  interface Session {
-    user: {
-      id: string
-      role: string
-    } & DefaultSession["user"]
-  }
-}
+import { credentialsSchema } from "@/lib/credentials"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
@@ -22,30 +10,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       name: "credentials",
       credentials: {
-        email: { label: "邮箱", type: "email" },
+        username: { label: "用户名", type: "text" },
         password: { label: "密码", type: "password" },
       },
       async authorize(credentials) {
-        const email = (credentials?.email as string)?.toLowerCase().trim() || ""
-        const password = (credentials?.password as string) || ""
-
-        if (!email || !password) {
-          throw new Error("邮箱和密码不能为空")
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-          throw new Error("邮箱格式不正确")
-        }
-
-        if (password.length < 6) {
-          throw new Error("密码至少6位")
-        }
+        const parsed = credentialsSchema.safeParse(credentials)
+        if (!parsed.success) return null
+        const { username, password } = parsed.data
 
         const user = await prisma.user.findUnique({
-          where: { email },
+          where: { username },
         })
 
-        if (!user || !user.passwordHash) {
+        if (!user || !user.isActive || !user.passwordHash) {
           return null
         }
 
@@ -59,7 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         return {
           id: user.id,
-          email: user.email,
+          username: user.username,
           name: user.name,
           role: user.role,
         }
@@ -71,10 +48,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     error: "/login/error",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id!
         token.role = user.role
+        token.username = user.username
+      }
+      if (trigger === "update" && typeof token.id === "string") {
+        // Read profile changes from the database; never accept client-supplied identity or roles.
+        const profile = await prisma.user.findUnique({
+          where: { id: token.id },
+          select: { username: true, name: true },
+        })
+        if (profile) {
+          token.username = profile.username
+          token.name = profile.name
+        }
       }
       return token
     },
@@ -82,6 +71,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as string
+        session.user.username = typeof token.username === "string" ? token.username : ""
+        session.user.name = token.name ?? null
       }
       return session
     },

@@ -9,11 +9,13 @@ import { useState } from "react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 
+import { usernameSchema, passwordSchema } from "@/lib/credentials"
+
 const registerAuthSchema = z
   .object({
-    email: z.string().email("请输入有效的邮箱地址"),
+    username: usernameSchema,
     nickname: z.string().min(2, "昵称至少2个字符"),
-    password: z.string().min(6, "密码至少6位"),
+    password: passwordSchema,
     confirmPassword: z.string(),
     role: z.enum(["PARENT", "KID"]),
   })
@@ -46,7 +48,7 @@ export default function RegisterAuthPage() {
     setError("")
 
     const formData = new FormData()
-    formData.append("email", data.email)
+    formData.append("username", data.username)
     formData.append("password", data.password)
     formData.append("nickname", data.nickname)
     formData.append("role", data.role)
@@ -65,13 +67,13 @@ export default function RegisterAuthPage() {
       }
 
       const result = await signIn("credentials", {
-        email: data.email,
+        username: data.username,
         password: data.password,
         redirect: false,
       })
 
       if (result?.error) {
-        setError(result.error === "CredentialsSignin" ? "邮箱或密码错误" : result.error)
+        setError(result.error === "CredentialsSignin" ? "用户名或密码错误" : result.error)
         setIsLoading(false)
         return
       }
@@ -93,7 +95,7 @@ export default function RegisterAuthPage() {
             创建账号
           </h1>
           <p className="text-warm-400">
-            输入邮箱、昵称和密码即可注册
+            输入用户名、昵称和密码即可注册
           </p>
         </div>
 
@@ -109,23 +111,25 @@ export default function RegisterAuthPage() {
 
           <div>
             <label
-              htmlFor="email"
+              htmlFor="username"
               className="block text-sm font-medium text-warm-600 mb-1.5"
             >
-              电子邮箱
+              用户名
             </label>
             <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="hello@example.com"
-              {...register("email")}
+              id="username"
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="如：爸爸、xiaoming"
+              {...register("username")}
               className="w-full h-12 px-4 rounded-xl border-2 border-warm-200 bg-warm-50 
                 text-warm-700 text-base placeholder:text-warm-400
                 focus:border-candy-blue focus:bg-white focus:outline-none transition-colors"
             />
-            {errors.email && (
-              <p className="text-candy-red text-xs mt-1.5">{errors.email.message}</p>
+            {errors.username && (
+              <p className="text-candy-red text-xs mt-1.5">{errors.username.message}</p>
             )}
           </div>
 

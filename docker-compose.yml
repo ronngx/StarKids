@@ -4,8 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        DATABASE_URL: postgresql://starkids:starkids@db:5432/starkids
-        AUTH_SECRET: ${AUTH_SECRET:-change-me-to-a-random-secret-in-production}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     image: starkids-app:local
     container_name: starkids-app
     restart: unless-stopped
@@ -17,11 +16,6 @@ services:
       - AUTH_SECRET=${AUTH_SECRET:-change-me-to-a-random-secret-in-production}
       - AUTH_URL=${AUTH_URL:-http://localhost:3000}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-      - EMAIL_SERVER_HOST=${EMAIL_SERVER_HOST:-smtp.resend.com}
-      - EMAIL_SERVER_PORT=${EMAIL_SERVER_PORT:-465}
-      - EMAIL_SERVER_USER=${EMAIL_SERVER_USER:-resend}
-      - EMAIL_SERVER_PASSWORD=${EMAIL_SERVER_PASSWORD:-}
-      - EMAIL_FROM=${EMAIL_FROM:-StarKids <noreply@starkids.app>}
     depends_on:
       db:
         condition: service_healthy
