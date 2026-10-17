@@ -326,12 +326,13 @@ function AchievementForm({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-warm-600 mb-1">奖励积分</label>
+          <label className="block text-sm font-medium text-warm-600 mb-1">奖励积分（最多两位小数）</label>
           <input
             name="bonusPoints"
             type="number"
             defaultValue={editItem?.bonusPoints || 0}
             min={0}
+            step={0.01}
             className="w-full h-10 px-3 rounded-lg border border-warm-200 text-sm"
           />
         </div>
@@ -374,12 +375,13 @@ function AchievementForm({
         )}
         {(conditionType === "TOTAL_POINTS") && (
           <div>
-            <label className="block text-sm font-medium text-warm-600 mb-1">积分要求</label>
+            <label className="block text-sm font-medium text-warm-600 mb-1">积分要求（最多两位小数）</label>
             <input
               name="conditionPoints"
               type="number"
               defaultValue={cond?.points || 0}
               min={0}
+              step={0.01}
               className="w-full h-10 px-3 rounded-lg border border-warm-200 text-sm"
             />
           </div>

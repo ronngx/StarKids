@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { normalizePoints } from "@/lib/points"
 import { updateFamilyMember } from "@/lib/actions/family"
 
 export async function GET() {
@@ -39,7 +40,10 @@ export async function GET() {
     inviteCode: family?.inviteCode || "",
     createdAt: family?.createdAt || "",
     canManageMembers: currentMember.role === "PARENT",
-    members,
+    members: members.map((member) => ({
+      ...member,
+      currentPoints: normalizePoints(member.currentPoints),
+    })),
   })
 }
 

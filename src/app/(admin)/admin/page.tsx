@@ -5,6 +5,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { CardSkeleton } from "@/components/ui/Skeleton"
 import { SPECIES_EMOJI, STAGE_LABELS } from "@/lib/constants"
+import { formatPoints } from "@/lib/points"
 
 type AnalyticsOverview = {
   totalTasksCompleted: number
@@ -178,7 +179,7 @@ export default function AdminDashboardPage() {
                     <div>
                       <p className="font-medium text-sm text-warm-700">{task.name}</p>
                       <p className="text-xs text-warm-400">
-                        +{task.points}⭐
+                        +{formatPoints(task.points)}⭐
                         {task.assignees.length > 0 && (
                           <span> · {task.assignees.map((a) => a.nickname).join(", ")}</span>
                         )}
@@ -235,7 +236,7 @@ export default function AdminDashboardPage() {
                       <p className="text-xs text-warm-400 mt-0.5">
                         {m.pet ? `${STAGE_LABELS[m.pet.stage] || m.pet.stage}` : "暂无宠物"}
                         {" · "}
-                        <span className="text-brand-500">{m.currentPoints || 0}⭐</span>
+                        <span className="text-brand-500">{formatPoints(m.currentPoints)}⭐</span>
                         {" · 本月完成"}
                         <span className="text-candy-green">{m.completed30d || 0}个</span>
                       </p>

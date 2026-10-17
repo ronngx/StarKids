@@ -8,6 +8,7 @@ import { CATEGORY_LABELS } from "@/lib/constants"
 import { useToast } from "@/components/ui/ToastProvider"
 import { PageTransition } from "@/components/ui/PageTransition"
 import { ListSkeleton } from "@/components/ui/Skeleton"
+import { formatPoints } from "@/lib/points"
 
 type KidTask = {
   id: string
@@ -142,7 +143,7 @@ export default function KidsTasksPage() {
                   )}
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs text-candy-orange font-semibold">
-                      +{task.points}⭐
+                      +{formatPoints(task.points)}⭐
                     </span>
                     <span className="text-xs px-1.5 py-0.5 rounded bg-warm-100 text-warm-500">
                       {CATEGORY_LABELS[task.category] || task.category}

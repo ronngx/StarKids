@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { parsePoints } from "@/lib/points"
 
 export async function GET() {
   try {
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
         familyId: member.familyId,
         name: body.name,
         description: body.description || null,
-        points: body.points || 0,
+        points: parsePoints(body.points, { min: 0.01, fieldName: "所需积分" }),
         category: body.category || "OTHER",
         isFeatured: body.isFeatured || false,
         stock: body.stock || 0,

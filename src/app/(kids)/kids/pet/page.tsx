@@ -10,6 +10,7 @@ type StageInfo = { threshold: number; emoji: string; label: string }
 import { useToast } from "@/components/ui/ToastProvider"
 import { PageTransition } from "@/components/ui/PageTransition"
 import { ProfileSkeleton } from "@/components/ui/Skeleton"
+import { formatPoints } from "@/lib/points"
 
 type PetData = {
   id: string
@@ -285,7 +286,7 @@ export default function KidsPetPage() {
             <div className="flex items-center justify-between text-xs text-warm-400 mb-1">
               <span>成长进度</span>
               <span>
-                {totalPoints}⭐
+                {formatPoints(totalPoints)}⭐
                 {nextStage && ` / ${nextStage.threshold}⭐`}
               </span>
             </div>
@@ -297,7 +298,7 @@ export default function KidsPetPage() {
             </div>
             {nextStage && (
               <p className="text-xs text-warm-400 mt-1">
-                距离{nextStage.label}还差 {nextStage.threshold - totalPoints}⭐
+                距离{nextStage.label}还差 {formatPoints(nextStage.threshold - totalPoints)}⭐
               </p>
             )}
           </div>
@@ -349,7 +350,7 @@ export default function KidsPetPage() {
           </div>
           <div>
             <p className="text-xs text-warm-400">累计获得积分</p>
-            <p className="font-kids text-2xl text-brand-500">{totalPoints} ⭐</p>
+            <p className="font-kids text-2xl text-brand-500">{formatPoints(totalPoints)} ⭐</p>
           </div>
         </div>
       </div>
@@ -390,7 +391,7 @@ export default function KidsPetPage() {
                       {isEquipped && " ✅"}
                     </p>
                     {!isUnlocked && !outfit.isDefault && (
-                      <p className="text-xs text-candy-orange mt-0.5">{outfit.points}⭐ 解锁</p>
+                      <p className="text-xs text-candy-orange mt-0.5">{formatPoints(outfit.points)}⭐ 解锁</p>
                     )}
                     {isUnlocked && isEquipped && (
                       <p className="text-xs text-candy-purple mt-0.5">穿着中</p>

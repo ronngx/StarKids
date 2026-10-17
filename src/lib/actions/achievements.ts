@@ -4,6 +4,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import type { AchievementCategory } from "@prisma/client"
+import { parsePoints } from "@/lib/points"
 
 export async function createAchievement(formData: FormData) {
   const session = await auth()
@@ -24,7 +25,7 @@ export async function createAchievement(formData: FormData) {
     condition.days = parseInt(formData.get("conditionDays") as string) || 0
   }
   if (conditionType === "TOTAL_POINTS") {
-    condition.points = parseInt(formData.get("conditionPoints") as string) || 0
+    condition.points = parsePoints(formData.get("conditionPoints"), { min: 0, defaultValue: 0, fieldName: "积分要求" })
   }
   if (conditionType === "REDEMPTION_COUNT") {
     condition.count = parseInt(formData.get("conditionCount") as string) || 0
@@ -40,7 +41,7 @@ export async function createAchievement(formData: FormData) {
       icon: (formData.get("icon") as string) || "🏆",
       category: (formData.get("category") as AchievementCategory) || "SPECIAL",
       condition: JSON.stringify(condition),
-      bonusPoints: parseInt(formData.get("bonusPoints") as string) || 0,
+      bonusPoints: parsePoints(formData.get("bonusPoints"), { min: 0, defaultValue: 0, fieldName: "奖励积分" }),
       sortOrder: parseInt(formData.get("sortOrder") as string) || 0,
       isHidden: formData.get("isHidden") === "true",
       isActive: true,
@@ -68,7 +69,7 @@ export async function updateAchievement(formData: FormData) {
     condition.days = parseInt(formData.get("conditionDays") as string) || 0
   }
   if (conditionType === "TOTAL_POINTS") {
-    condition.points = parseInt(formData.get("conditionPoints") as string) || 0
+    condition.points = parsePoints(formData.get("conditionPoints"), { min: 0, defaultValue: 0, fieldName: "积分要求" })
   }
   if (conditionType === "REDEMPTION_COUNT") {
     condition.count = parseInt(formData.get("conditionCount") as string) || 0
@@ -85,7 +86,7 @@ export async function updateAchievement(formData: FormData) {
       icon: (formData.get("icon") as string) || "🏆",
       category: (formData.get("category") as AchievementCategory) || "SPECIAL",
       condition: JSON.stringify(condition),
-      bonusPoints: parseInt(formData.get("bonusPoints") as string) || 0,
+      bonusPoints: parsePoints(formData.get("bonusPoints"), { min: 0, defaultValue: 0, fieldName: "奖励积分" }),
       sortOrder: parseInt(formData.get("sortOrder") as string) || 0,
       isHidden: formData.has("isHidden") ? formData.get("isHidden") === "true" : undefined,
     },

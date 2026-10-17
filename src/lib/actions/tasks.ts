@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { calculatePoints } from "@/lib/points-engine"
 import { checkAchievements } from "@/lib/achievement-engine"
+import { formatPoints, normalizePoints, parsePoints } from "@/lib/points"
 import { createNotification } from "./notifications"
 import type { TaskCategory, TaskType, TaskFrequency, TaskDifficulty, TaskStatus } from "@prisma/client"
 
@@ -22,7 +23,7 @@ export async function createTask(formData: FormData) {
   if (!member) throw new Error("只有家长才能创建任务")
 
   const name = formData.get("name") as string
-  const points = parseInt(formData.get("points") as string) || 5
+  const points = parsePoints(formData.get("points"), { min: 0.01, defaultValue: 5 })
 
   const kids = await prisma.familyMember.findMany({
     where: { familyId: member.familyId, role: "KID" },
@@ -78,6 +79,8 @@ export async function updateTask(formData: FormData) {
 
   const name = formData.get("name") as string
 
+  const pointsValue = formData.get("points")
+
   await prisma.task.update({
     where: { id },
     data: {
@@ -88,7 +91,9 @@ export async function updateTask(formData: FormData) {
       type: (formData.get("type") as TaskType) || existing.type,
       difficulty: (formData.get("difficulty") as TaskDifficulty) || existing.difficulty,
       frequency: (formData.get("frequency") as TaskFrequency) || existing.frequency,
-      points: parseInt(formData.get("points") as string) ?? existing.points,
+      points: pointsValue === null || (typeof pointsValue === "string" && pointsValue.trim() === "")
+        ? existing.points
+        : parsePoints(pointsValue, { min: 0.01 }),
       autoApprove: formData.has("autoApprove")
         ? formData.get("autoApprove") === "true"
         : existing.autoApprove,
@@ -178,7 +183,7 @@ export async function completeTask(taskId: string) {
   if (existing) throw new Error("今天已经提交过这个任务了")
 
   const { totalPoints } = await calculatePoints(
-    task.points,
+    normalizePoints(task.points),
     member.id,
     member.familyId
   )
@@ -218,7 +223,7 @@ export async function completeTask(taskId: string) {
           type: "TASK_COMPLETED",
           priority: "NORMAL",
           title: `${member.nickname} 完成了任务`,
-          content: `"${task.name}" +${totalPoints}⭐，等待你的审核`,
+          content: `"${task.name}" +${formatPoints(totalPoints)}⭐，等待你的审核`,
           link: "/admin/tasks",
           data: { completionId: completion.id, taskId, memberId: member.id },
         })
@@ -340,7 +345,7 @@ export async function approveTask(completionId: string, note?: string) {
       type: "TASK_APPROVED",
       priority: "HIGH",
       title: "任务审核通过！🎉",
-      content: `"${completion.task.name}" 已审核通过，获得 ${completion.pointsEarned}⭐`,
+      content: `"${completion.task.name}" 已审核通过，获得 ${formatPoints(completion.pointsEarned)}⭐`,
       link: "/kids/tasks",
     })
   } catch (e) {

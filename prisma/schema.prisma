@@ -270,7 +270,7 @@ model FamilyMember {
   updatedAt   DateTime @updatedAt
 
   // 积分 (当前积分 = 收入 - 支出, 冗余字段方便查询)
-  currentPoints Int    @default(0)
+  currentPoints Float  @default(0)
 
   // 关联
   tasks           Task[]              @relation("TaskAssignees")
@@ -311,7 +311,7 @@ model Task {
   type        TaskType              @default(DAILY)
   frequency   TaskFrequency         @default(MANUAL)
   difficulty  TaskDifficulty        @default(MEDIUM)
-  points      Int                    @default(5)       // 基础积分
+  points      Float                  @default(5)       // 基础积分，最多两位小数
 
   // 生成规则
   autoApprove Boolean              @default(false)     // 是否自动通过 (简单任务)
@@ -358,7 +358,7 @@ model TaskTemplate {
   type        TaskType     @default(DAILY)
   frequency   TaskFrequency @default(DAILY)
   difficulty  TaskDifficulty @default(MEDIUM)
-  points      Int        @default(10)
+  points      Float      @default(10)                 // 基础积分，最多两位小数
   autoApprove Boolean    @default(false)
   maxDaily    Int        @default(1)
   weekDays    String     @default("[1,2,3,4,5]") // JSON array
@@ -385,7 +385,7 @@ model TaskCompletion {
 
   // 完成信息
   date        DateTime @default(now())       // 完成日期 (用于去重判断)
-  pointsEarned Int     @default(0)           // 实际获得积分 (可能有加成)
+  pointsEarned Float   @default(0)           // 实际获得积分 (可能有加成，最多两位小数)
   status      CompletionStatus @default(PENDING)
 
   // 审核信息
@@ -422,7 +422,7 @@ model Reward {
   tags        String    @default("[]")           // JSON array of tags
 
   // 积分与库存
-  points      Int                             // 所需积分
+  points      Float                           // 所需积分，最多两位小数
   stock       Int        @default(0)           // 库存 (0=不限)
   remainingStock Int     @default(0)           // 剩余库存
   maxPerPerson Int       @default(0)           // 每人限购 (0=不限)
@@ -455,7 +455,7 @@ model RewardRedemption {
   member      FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   // 兑换信息
-  pointsSpent Int                // 实际消耗积分
+  pointsSpent Float              // 实际消耗积分，最多两位小数
   status      RedemptionStatus @default(PENDING)
 
   // 留言
@@ -485,14 +485,14 @@ model PointLog {
   member      FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   // 变动信息
-  amount      Int                   // 正数=收入, 负数=支出
+  amount      Float                 // 正数=收入, 负数=支出，最多两位小数
   reason      PointReason           // 变动原因
   referenceId String?               // 关联ID (任务ID/兑换ID等)
   referenceType String?             // 关联类型 (Task/RewardRedemption/Manual/Achievement)
   note        String?               // 备注
 
   // 余额快照
-  balanceAfter Int                  // 变动后余额
+  balanceAfter Float                // 变动后余额，最多两位小数
 
   createdAt   DateTime @default(now())
 
@@ -522,7 +522,7 @@ model Achievement {
   condition   String
 
   // 奖励
-  bonusPoints Int      @default(0)
+  bonusPoints Float    @default(0)                 // 最多两位小数
   sortOrder   Int      @default(0)
 
   // 状态
@@ -571,7 +571,7 @@ model Pet {
   // 宠物属性
   species      PetSpecies
   name         String    @default("小宝贝")     // 小朋友给宠物取的名字
-  level        Int       @default(0)            // 成长值 (0-2000)
+  level        Float     @default(0)            // 成长值 (0-2000)，最多两位小数
   stage        PetStage  @default(EGG)
   mood         Int       @default(100)          // 心情值 (0-100)
 
@@ -599,7 +599,7 @@ model PetOutfit {
   description String?
   image       String?                          // 装扮图片
   species     PetSpecies?                      // 适用宠物 (null = 所有)
-  points      Int       @default(0)            // 解锁所需积分 (0 = 默认免费)
+  points      Float     @default(0)            // 解锁所需积分 (0 = 默认免费)，最多两位小数
   isDefault   Boolean   @default(false)        // 是否默认解锁
 
   sortOrder   Int       @default(0)
@@ -620,7 +620,7 @@ model PetOutfitGrant {
   memberId  String
   member    FamilyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
-  pointsSpent Int     @default(0)
+  pointsSpent Float   @default(0)
   unlockedAt  DateTime @default(now())
 
   @@unique([outfitId, memberId])
@@ -736,7 +736,7 @@ model PointConfig {
   weekendDouble Boolean  @default(false)        // 周末双倍积分
   birthdayTriple Boolean @default(false)        // 生日三倍积分
   enableDeduction Boolean @default(false)       // 是否允许扣积分
-  dailyCap      Int      @default(0)            // 每日积分上限 (0=不限)
+  dailyCap      Float    @default(0)            // 每日积分上限 (0=不限)，最多两位小数
   resetType     String   @default("NONE")       // NONE / MONTHLY / YEARLY / SEMESTER
 
   // 连续奖励 (JSON)
@@ -761,7 +761,7 @@ model ThemeSkin {
   member      FamilyMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
 
   skin        SkinType
-  points      Int      @default(0)              // 解锁所需积分 (0 = 默认)
+  points      Float    @default(0)              // 解锁所需积分 (0 = 默认)，最多两位小数
   isUnlocked  Boolean  @default(false)
   isDefault   Boolean  @default(false)
   isActive    Boolean  @default(true)
@@ -785,8 +785,8 @@ model DailyStats {
   tasksAssigned   Int      @default(0)          // 分配的任务数
   tasksCompleted  Int      @default(0)          // 完成的任务数
   tasksApproved   Int      @default(0)          // 批准的任务数
-  pointsEarned    Int      @default(0)          // 当日获得积分
-  pointsSpent     Int      @default(0)          // 当日消费积分
+  pointsEarned    Float    @default(0)          // 当日获得积分
+  pointsSpent     Float    @default(0)          // 当日消费积分
   redemptions     Int      @default(0)          // 当日兑换次数
   streak          Int      @default(0)          // 连续天数
 
@@ -809,8 +809,8 @@ model WeeklyStats {
 
   tasksCompleted  Int      @default(0)
   tasksCompletedRate Float  @default(0)          // 完成率 (0-100)
-  pointsEarned    Int      @default(0)
-  pointsSpent     Int      @default(0)
+  pointsEarned    Float    @default(0)
+  pointsSpent     Float    @default(0)
   redemptions     Int      @default(0)
   achievements    Int      @default(0)          // 本周获得成就数
 

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db"
 import type { Prisma } from "@prisma/client"
 import { SPECIES_EMOJI, STAGE_CONFIG } from "@/lib/constants"
+import { normalizePoints } from "@/lib/points"
 
 type AchievementCondition = {
   type: string
@@ -67,12 +68,12 @@ export async function checkAchievements(
           await db.taskCompletion.update({
             where: { id: completionId },
             data: {
-                pointsEarned: completion.pointsEarned + achievement.bonusPoints,
+                pointsEarned: normalizePoints(completion.pointsEarned + achievement.bonusPoints),
             },
           })
           await db.familyMember.update({
             where: { id: memberId },
-            data: { currentPoints: { increment: achievement.bonusPoints } },
+            data: { currentPoints: { increment: normalizePoints(achievement.bonusPoints) } },
           })
         }
       }
@@ -123,7 +124,7 @@ async function checkCondition(
         where: { memberId, status: "APPROVED" },
         _sum: { pointsEarned: true },
       })
-      return (result._sum.pointsEarned || 0) >= (condition.points || 0)
+      return normalizePoints(result._sum.pointsEarned) >= normalizePoints(condition.points)
     }
 
     case "SPECIAL_DATE": {

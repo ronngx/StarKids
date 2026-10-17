@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { PageTransition } from "@/components/ui/PageTransition"
 import { ProfileSkeleton, GridSkeleton } from "@/components/ui/Skeleton"
+import { formatPoints } from "@/lib/points"
 
 type KidTask = {
   id: string
@@ -115,7 +116,7 @@ export default function KidsHomePage() {
       <div className="bg-white rounded-card shadow-soft p-5 space-y-4">
         <div className="text-center">
           <p className="text-warm-400 text-sm">💫 当前积分</p>
-          <p className="font-kids text-5xl text-brand-500">{member?.currentPoints || 0} ⭐</p>
+          <p className="font-kids text-5xl text-brand-500">{formatPoints(member?.currentPoints)} ⭐</p>
         </div>
 
         <div className="flex gap-3 justify-center">
@@ -167,7 +168,7 @@ export default function KidsHomePage() {
                     </span>
                   </div>
                   <span className={`font-semibold text-sm ${isDone ? "text-candy-green" : "text-candy-orange"}`}>
-                    +{task.points}⭐
+                    +{formatPoints(task.points)}⭐
                   </span>
                 </div>
               )

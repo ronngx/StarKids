@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { normalizePoints } from "@/lib/points"
 
 export async function GET() {
   try {
@@ -74,7 +75,7 @@ export async function GET() {
     const key = new Date(c.date).toISOString().slice(0, 10)
     if (dailyStats[key]) {
       dailyStats[key].completed++
-      dailyStats[key].points += c.pointsEarned
+      dailyStats[key].points = normalizePoints(dailyStats[key].points + c.pointsEarned)
     }
   }
 
@@ -96,7 +97,7 @@ export async function GET() {
     const approved = myAll30d.filter((c) => c.status === "APPROVED").length
     const total = myAll30d.length
     const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 100
-    const totalPoints = myCompletions.reduce((sum, c) => sum + c.pointsEarned, 0)
+    const totalPoints = normalizePoints(myCompletions.reduce((sum, c) => sum + c.pointsEarned, 0))
 
     // 分类分布
     const categoryMap: Record<string, number> = {}
@@ -130,7 +131,7 @@ export async function GET() {
     return {
       memberId: km.id,
       nickname: km.nickname,
-      currentPoints: km.currentPoints,
+      currentPoints: normalizePoints(km.currentPoints),
       pet: km.pet ? { species: km.pet.species, stage: km.pet.stage, level: km.pet.level } : null,
       completed30d: approved,
       total30d: total,
@@ -143,7 +144,7 @@ export async function GET() {
 
   // ── 全局概览 ──
   const totalCompleted30d = allCompletions.length
-  const totalPoints30d = allCompletions.reduce((sum, c) => sum + c.pointsEarned, 0)
+  const totalPoints30d = normalizePoints(allCompletions.reduce((sum, c) => sum + c.pointsEarned, 0))
   const totalCompletions30dAll = completions30d.filter((c) => c.status === "APPROVED").length
   const totalAll = completions30d.length
   const overallRate = totalAll > 0 ? Math.round((totalCompletions30dAll / totalAll) * 100) : 100
@@ -153,7 +154,7 @@ export async function GET() {
   const trendMap: Record<string, number> = {}
   for (const c of allCompletions) {
     const key = new Date(c.date).toISOString().slice(0, 10)
-    trendMap[key] = (trendMap[key] || 0) + c.pointsEarned
+    trendMap[key] = normalizePoints((trendMap[key] || 0) + c.pointsEarned)
   }
 
   for (let i = 29; i >= 0; i--) {

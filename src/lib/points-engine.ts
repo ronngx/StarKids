@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db"
+import { formatPoints, normalizePoints } from "@/lib/points"
 
 type PointRuleParams = {
   days?: number
@@ -19,7 +20,8 @@ export async function calculatePoints(
   memberId: string,
   familyId: string,
 ): Promise<BonusResult> {
-  const breakdown: string[] = [`基础积分: +${taskPoints}⭐`]
+  taskPoints = normalizePoints(taskPoints)
+  const breakdown: string[] = [`基础积分: +${formatPoints(taskPoints)}⭐`]
   let bonusPoints = 0
 
   const [rules, member, config] = await Promise.all([
@@ -42,37 +44,38 @@ export async function calculatePoints(
       case "STREAK_BONUS": {
         const streakDays = await getStreakDays(memberId)
         if (params.days && streakDays >= params.days) {
-          const bonus = params.bonus || 0
+          const bonus = normalizePoints(params.bonus || 0)
           bonusPoints += bonus
-          breakdown.push(`${rule.name}: +${bonus}⭐`)
+          breakdown.push(`${rule.name}: +${formatPoints(bonus)}⭐`)
         }
         break
       }
 
       case "WEEKEND_DOUBLE": {
         if (isWeekend() && config?.weekendDouble) {
-          const bonus = taskPoints * ((params.multiplier || 2) - 1)
-          bonusPoints += bonus
-          breakdown.push(`${rule.name}: +${bonus}⭐`)
+          const bonus = normalizePoints(taskPoints * ((params.multiplier || 2) - 1))
+          bonusPoints = normalizePoints(bonusPoints + bonus)
+          breakdown.push(`${rule.name}: +${formatPoints(bonus)}⭐`)
         }
         break
       }
 
       case "BIRTHDAY_TRIPLE": {
         if (member?.birthdate && isBirthday(member.birthdate) && config?.birthdayTriple) {
-          const bonus = taskPoints * ((params.multiplier || 3) - 1)
-          bonusPoints += bonus
-          breakdown.push(`🎂 ${rule.name}: +${bonus}⭐`)
+          const bonus = normalizePoints(taskPoints * ((params.multiplier || 3) - 1))
+          bonusPoints = normalizePoints(bonusPoints + bonus)
+          breakdown.push(`🎂 ${rule.name}: +${formatPoints(bonus)}⭐`)
         }
         break
       }
 
       case "DAILY_CAP": {
         const todayPoints = await getTodayPoints(memberId)
-        const maxPoints = params.cap || 0
-        if (maxPoints > 0 && todayPoints + taskPoints + bonusPoints > maxPoints) {
-          const maxBonus = Math.max(0, maxPoints - todayPoints - taskPoints)
-          bonusPoints = Math.min(bonusPoints, maxBonus)
+        const maxPoints = normalizePoints(params.cap || 0)
+        const earnedBeforeCap = normalizePoints(todayPoints + taskPoints + bonusPoints)
+        if (maxPoints > 0 && earnedBeforeCap > maxPoints) {
+          const maxBonus = Math.max(0, normalizePoints(maxPoints - todayPoints - taskPoints))
+          bonusPoints = normalizePoints(Math.min(bonusPoints, maxBonus))
           breakdown.push(`⚠️ 已达到每日积分上限`)
         }
         break
@@ -82,8 +85,8 @@ export async function calculatePoints(
 
   return {
     basePoints: taskPoints,
-    bonusPoints,
-    totalPoints: taskPoints + bonusPoints,
+    bonusPoints: normalizePoints(bonusPoints),
+    totalPoints: normalizePoints(taskPoints + bonusPoints),
     breakdown,
   }
 }
@@ -139,7 +142,7 @@ async function getTodayPoints(memberId: string): Promise<number> {
     _sum: { pointsEarned: true },
   })
 
-  return completions._sum.pointsEarned || 0
+  return normalizePoints(completions._sum.pointsEarned)
 }
 
 function isWeekend(): boolean {

@@ -140,13 +140,14 @@ export default function AdminPointsPage() {
           </div>
 
           <div className="p-4 bg-warm-50 rounded-xl">
-            <h3 className="font-semibold text-warm-800 mb-2">每日积分上限</h3>
+            <h3 className="font-semibold text-warm-800 mb-2">每日积分上限（最多两位小数）</h3>
             <p className="text-sm text-warm-400 mb-3">每天最多可以获得的积分 (0=不限)</p>
             <input
               type="number"
               name="dailyCap"
               defaultValue={config?.dailyCap || 0}
               min={0}
+              step={0.01}
               className="w-24 h-9 px-3 rounded-lg border border-warm-200 text-sm"
             />
             <span className="text-sm text-warm-400 ml-2">⭐ 积分</span>

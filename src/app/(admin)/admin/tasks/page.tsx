@@ -5,6 +5,7 @@ import { createTask, updateTask, deleteTask, approveTask, rejectTask } from "@/l
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { CardSkeleton } from "@/components/ui/Skeleton"
+import { formatPoints } from "@/lib/points"
 
 const EMOJI_PRESETS = ["🪥", "📖", "🧹", "🏃", "✏️", "🎨", "🎹", "📚", "🥦", "🧸", "🎒", "🛏️", "🍽️", "👀", "🌙", "👕", "🙏", "🤝", "💧", "🚲"]
 
@@ -228,7 +229,7 @@ export default function AdminTasksPage() {
                       )}
                       <div className="flex flex-wrap items-center gap-2 mt-3 text-xs">
                         <span className="px-2 py-1 rounded-md bg-brand-50 text-brand-700">
-                          积分：+{task.points}⭐
+                          积分：+{formatPoints(task.points)}⭐
                         </span>
                         <span className={cn(
                           "px-2 py-1 rounded-md",
@@ -401,12 +402,13 @@ function TaskForm({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-warm-600 mb-1">积分</label>
+          <label className="block text-sm font-medium text-warm-600 mb-1">积分（最多两位小数）</label>
           <input
             name="points"
             type="number"
             defaultValue={task?.points ?? 5}
-            min={1}
+            min={0.01}
+            step={0.01}
             className="w-full h-10 px-3 rounded-lg border border-warm-200 text-warm-700 text-sm focus:border-admin-primary focus:outline-none"
           />
         </div>

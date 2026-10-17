@@ -6,6 +6,7 @@ import { createOutfit, updateOutfit, deleteOutfit, unlockOutfit } from "@/lib/ac
 import { cn } from "@/lib/utils"
 import { CardSkeleton } from "@/components/ui/Skeleton"
 import { useToast } from "@/components/ui/ToastProvider"
+import { formatPoints } from "@/lib/points"
 
 const SPECIES_OPTIONS = [
   { value: "ALL", label: "全部适用", emoji: "🐾" },
@@ -201,7 +202,7 @@ export default function AdminPetsPage() {
                       )}
                       <div className="flex items-center gap-3 mt-2 text-sm">
                         {outfit.points > 0 && (
-                          <span className="text-candy-orange font-semibold">{outfit.points}⭐</span>
+                          <span className="text-candy-orange font-semibold">{formatPoints(outfit.points)}⭐</span>
                         )}
                         {outfit.points === 0 && !outfit.isDefault && (
                           <span className="text-candy-green font-semibold">免费</span>
@@ -282,7 +283,7 @@ export default function AdminPetsPage() {
             </h3>
             <p className="text-sm text-warm-500">
               选择要获得此装扮的小朋友
-              {grantDialog.points > 0 && ` (消耗 ${grantDialog.points}⭐)`}
+              {grantDialog.points > 0 && ` (消耗 ${formatPoints(grantDialog.points)}⭐)`}
             </p>
             <div className="space-y-2">
               {members.map((m) => (
@@ -362,12 +363,13 @@ function OutfitForm({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-warm-600 mb-1">所需积分 (0=免费)</label>
+          <label className="block text-sm font-medium text-warm-600 mb-1">所需积分（最多两位小数，0=免费）</label>
           <input
             name="points"
             type="number"
             defaultValue={editItem?.points || 0}
             min={0}
+            step={0.01}
             className="w-full h-10 px-3 rounded-lg border border-warm-200 text-sm"
           />
         </div>

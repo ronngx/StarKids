@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { memberUpdateSchema, usernameSchema, passwordSchema } from "@/lib/credentials"
+import { formatPoints } from "@/lib/points"
 
 type FamilyMember = {
   id: string
@@ -231,7 +232,7 @@ export default function AdminFamilyPage() {
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3 w-full sm:w-auto">
             {isKid && <div className="text-right">
-              <p className="text-sm font-kids text-candy-orange">{member.currentPoints || 0}⭐</p>
+              <p className="text-sm font-kids text-candy-orange">{formatPoints(member.currentPoints)}⭐</p>
               <p className="text-xs text-warm-400">当前积分</p>
             </div>}
             {data?.canManageMembers && <button

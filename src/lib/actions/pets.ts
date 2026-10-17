@@ -3,6 +3,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { normalizePoints } from "@/lib/points"
 import type { PetSpecies, PetStage } from "@prisma/client"
 import { STAGE_CONFIG, SPECIES_EMOJI } from "@/lib/constants"
 
@@ -58,7 +59,7 @@ export async function feedPet() {
     _sum: { pointsEarned: true },
   })
 
-  const newLevel = totalEarned._sum.pointsEarned || 0
+  const newLevel = normalizePoints(totalEarned._sum.pointsEarned)
   let newStage = pet.stage
 
   for (const [stage, config] of Object.entries(STAGE_CONFIG)) {

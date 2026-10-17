@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { parsePoints } from "@/lib/points"
 
 export async function GET() {
   try {
@@ -53,13 +54,13 @@ export async function POST(request: Request) {
       familyId: member.familyId,
       weekendDouble: formData.get("weekendDouble") === "true",
       birthdayTriple: formData.get("birthdayTriple") === "true",
-      dailyCap: parseInt(formData.get("dailyCap") as string) || 0,
+      dailyCap: parsePoints(formData.get("dailyCap"), { min: 0, defaultValue: 0, fieldName: "每日积分上限" }),
       resetType: (formData.get("resetType") as string) || "NONE",
     },
     update: {
       weekendDouble: formData.get("weekendDouble") === "true",
       birthdayTriple: formData.get("birthdayTriple") === "true",
-      dailyCap: parseInt(formData.get("dailyCap") as string) || 0,
+      dailyCap: parsePoints(formData.get("dailyCap"), { min: 0, defaultValue: 0, fieldName: "每日积分上限" }),
       resetType: (formData.get("resetType") as string) || "NONE",
     },
   })

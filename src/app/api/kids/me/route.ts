@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { normalizePoints } from "@/lib/points"
 
 export async function GET() {
   const session = await auth()
@@ -47,7 +48,7 @@ export async function GET() {
     nickname: member.nickname,
     role: member.role,
     familyName: member.family.name,
-    currentPoints: member.currentPoints,
+    currentPoints: normalizePoints(member.currentPoints),
     streak,
   })
 }

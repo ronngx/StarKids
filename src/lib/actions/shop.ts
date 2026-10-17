@@ -3,6 +3,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { formatPoints, normalizePoints, parsePoints } from "@/lib/points"
 import { createNotification } from "./notifications"
 import type { RewardCategory, RewardStatus } from "@prisma/client"
 
@@ -21,7 +22,7 @@ export async function createReward(formData: FormData) {
       name: (formData.get("name") as string).trim(),
       description: (formData.get("description") as string) || null,
       category: (formData.get("category") as RewardCategory) || "TOY",
-      points: parseInt(formData.get("points") as string) || 50,
+      points: parsePoints(formData.get("points"), { min: 0.01, defaultValue: 50 }),
       stock: parseInt(formData.get("stock") as string) || 0,
       remainingStock: parseInt(formData.get("stock") as string) || 0,
       maxPerPerson: parseInt(formData.get("maxPerPerson") as string) || 0,
@@ -41,6 +42,8 @@ export async function updateReward(formData: FormData) {
 
   const id = formData.get("id") as string
 
+  const pointsValue = formData.get("points")
+
   await prisma.reward.update({
     where: { id },
     data: {
@@ -48,7 +51,9 @@ export async function updateReward(formData: FormData) {
       description: (formData.get("description") as string) || null,
       category: (formData.get("category") as RewardCategory) || undefined,
       image: formData.get("image") as string || undefined,
-      points: parseInt(formData.get("points") as string) || undefined,
+      points: pointsValue === null || (typeof pointsValue === "string" && pointsValue.trim() === "")
+        ? undefined
+        : parsePoints(pointsValue, { min: 0.01 }),
       status: (formData.get("status") as RewardStatus) || undefined,
       isFeatured: formData.has("isFeatured") ? formData.get("isFeatured") === "true" : undefined,
     }
@@ -87,8 +92,11 @@ export async function redeemReward(rewardId: string, message?: string) {
     throw new Error("库存不足")
   }
 
-  if (member.currentPoints < reward.points) {
-    throw new Error(`积分不足！需要 ${reward.points}⭐，当前 ${member.currentPoints}⭐`)
+  const currentPoints = normalizePoints(member.currentPoints)
+  const rewardPoints = normalizePoints(reward.points)
+
+  if (currentPoints < rewardPoints) {
+    throw new Error(`积分不足！需要 ${formatPoints(rewardPoints)}⭐，当前 ${formatPoints(currentPoints)}⭐`)
   }
 
   const redemption = await prisma.$transaction(async (tx) => {
@@ -96,7 +104,7 @@ export async function redeemReward(rewardId: string, message?: string) {
       data: {
         rewardId,
         memberId: member.id,
-        pointsSpent: reward.points,
+        pointsSpent: rewardPoints,
         status: "PENDING",
         kidMessage: message || null,
       },
@@ -111,7 +119,7 @@ export async function redeemReward(rewardId: string, message?: string) {
 
     await tx.familyMember.update({
       where: { id: member.id },
-      data: { currentPoints: { decrement: reward.points } },
+      data: { currentPoints: { decrement: rewardPoints } },
     })
 
     return created
@@ -128,7 +136,7 @@ export async function redeemReward(rewardId: string, message?: string) {
       type: "REDEMPTION_REQUEST",
       priority: "HIGH",
       title: `${member.nickname} 申请兑换`,
-      content: `"${reward.name}" -${reward.points}⭐${message ? ` 留言: "${message}"` : ""}`,
+      content: `"${reward.name}" -${formatPoints(rewardPoints)}⭐${message ? ` 留言: "${message}"` : ""}`,
       link: "/admin/shop",
       data: { redemptionId: redemption.id, rewardId },
     })
@@ -202,7 +210,7 @@ export async function rejectRedemption(redemptionId: string, note?: string) {
 
     await tx.familyMember.update({
       where: { id: redemption.memberId },
-      data: { currentPoints: { increment: redemption.pointsSpent } },
+      data: { currentPoints: { increment: normalizePoints(redemption.pointsSpent) } },
     })
 
     return updated

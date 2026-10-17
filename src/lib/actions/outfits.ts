@@ -3,6 +3,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { normalizePoints, parsePoints } from "@/lib/points"
 import type { PetSpecies } from "@prisma/client"
 
 export async function createOutfit(formData: FormData) {
@@ -22,7 +23,7 @@ export async function createOutfit(formData: FormData) {
       description: (formData.get("description") as string) || null,
       image: (formData.get("image") as string) || "👗",
       species: (species && species !== "ALL" ? species : null) as PetSpecies | null,
-      points: parseInt(formData.get("points") as string) || 0,
+      points: parsePoints(formData.get("points"), { min: 0, defaultValue: 0 }),
       isDefault: formData.get("isDefault") === "true",
       sortOrder: parseInt(formData.get("sortOrder") as string) || 0,
       familyId: member.familyId,
@@ -48,7 +49,7 @@ export async function updateOutfit(formData: FormData) {
       description: (formData.get("description") as string) || null,
       image: (formData.get("image") as string) || "👗",
       species: (species && species !== "ALL" ? species : null) as any,
-      points: parseInt(formData.get("points") as string) || 0,
+      points: parsePoints(formData.get("points"), { min: 0, defaultValue: 0 }),
       isDefault: formData.get("isDefault") === "true",
       sortOrder: parseInt(formData.get("sortOrder") as string) || 0,
     } as any,
@@ -90,14 +91,14 @@ export async function unlockOutfit(formData: FormData) {
       data: {
         outfitId,
         memberId: kidMemberId,
-        pointsSpent: outfit.points,
+        pointsSpent: normalizePoints(outfit.points),
       },
     })
 
     if (outfit.points > 0) {
       await tx.familyMember.update({
         where: { id: kidMemberId },
-        data: { currentPoints: { decrement: outfit.points } },
+        data: { currentPoints: { decrement: normalizePoints(outfit.points) } },
       })
     }
   })

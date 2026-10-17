@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/ToastProvider"
 import { PageTransition } from "@/components/ui/PageTransition"
 import { GridSkeleton } from "@/components/ui/Skeleton"
+import { formatPoints } from "@/lib/points"
 
 type RewardData = {
   id: string
@@ -110,10 +111,10 @@ export default function KidsShopPage() {
               "font-kids text-4xl text-brand-500 transition-all",
               animateJar && "scale-110"
             )}>
-              {balance} ⭐
+              {formatPoints(balance)} ⭐
             </p>
             <p className="text-xs text-warm-400 mt-0.5">
-              累计获得 {totalEarned}⭐
+              累计获得 {formatPoints(totalEarned)}⭐
             </p>
           </div>
         </div>
@@ -237,7 +238,7 @@ function RewardCard({
       </div>
 
       <div className="text-center">
-        <p className="font-kids text-lg text-candy-orange">{reward.points} ⭐</p>
+        <p className="font-kids text-lg text-candy-orange">{formatPoints(reward.points)} ⭐</p>
         {reward.stock > 0 && (
           <p className="text-xs text-warm-400 mt-0.5">
             剩余 {reward.remainingStock}/{reward.stock}
@@ -264,7 +265,7 @@ function RewardCard({
           ? "已售罄"
           : canAfford
           ? `兑换`
-          : `还差 ${reward.points - balance}⭐`
+          : `还差 ${formatPoints(reward.points - balance)}⭐`
         }
       </button>
     </div>

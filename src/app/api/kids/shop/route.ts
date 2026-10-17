@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { normalizePoints } from "@/lib/points"
 
 export async function GET() {
   try {
@@ -27,12 +28,12 @@ export async function GET() {
       }),
     ])
 
-    const earned = totalEarned._sum.pointsEarned || 0
-    const spent = totalSpent._sum.pointsSpent || 0
+    const earned = normalizePoints(totalEarned._sum.pointsEarned)
+    const spent = normalizePoints(totalSpent._sum.pointsSpent)
 
     return NextResponse.json({
       rewards,
-      balance: member.currentPoints,
+      balance: normalizePoints(member.currentPoints),
       totalEarned: earned,
       totalSpent: spent,
     })

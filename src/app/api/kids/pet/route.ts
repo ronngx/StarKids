@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { normalizePoints } from "@/lib/points"
 import { STAGE_CONFIG, SPECIES_EMOJI } from "@/lib/constants"
 
 export async function GET() {
@@ -33,7 +34,7 @@ export async function GET() {
   ])
 
   const unlockedOutfitIds = new Set(grants.map((g) => g.outfitId))
-  const totalPoints = totalEarned._sum.pointsEarned || 0
+  const totalPoints = normalizePoints(totalEarned._sum.pointsEarned)
 
   let currentStage = "EGG"
   for (const [stage, cfg] of Object.entries(STAGE_CONFIG)) {

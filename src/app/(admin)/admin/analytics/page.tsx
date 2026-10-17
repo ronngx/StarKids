@@ -8,6 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, Legend,
 } from "recharts"
+import { formatPoints } from "@/lib/points"
 
 const CATEGORY_CHART_CONFIG: Record<string, { label: string; color: string }> = {
   HOUSEWORK: { label: "家务", color: "#6BCB77" },
@@ -274,7 +275,7 @@ export default function AdminAnalyticsPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-brand-500">{m.pointsEarned30d}⭐</p>
+                  <p className="text-sm font-semibold text-brand-500">{formatPoints(m.pointsEarned30d)}⭐</p>
                   <p className="text-xs text-warm-400">{m.completed30d}个任务</p>
                 </div>
                 <div className="w-16">

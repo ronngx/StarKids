@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createReward, deleteReward, approveRedemption, rejectRedemption } from "@/lib/actions/shop"
 import { cn } from "@/lib/utils"
 import { CardSkeleton } from "@/components/ui/Skeleton"
+import { formatPoints } from "@/lib/points"
 
 const CATEGORIES = [
   { value: "TOY", label: "🧸 玩具", color: "text-candy-pink" },
@@ -156,8 +157,8 @@ export default function AdminShopPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-warm-600 mb-1">所需积分 *</label>
-              <input name="points" type="number" defaultValue={50} min={1} className="w-full h-10 px-3 rounded-lg border border-warm-200 text-sm" />
+              <label className="block text-sm font-medium text-warm-600 mb-1">所需积分（最多两位小数）*</label>
+              <input name="points" type="number" defaultValue={50} min={0.01} step={0.01} className="w-full h-10 px-3 rounded-lg border border-warm-200 text-sm" />
             </div>
             <div>
               <label className="block text-sm font-medium text-warm-600 mb-1">库存 (0=不限)</label>
@@ -209,7 +210,7 @@ export default function AdminShopPage() {
                   {reward.isFeatured && <span className="text-xs px-2 py-0.5 rounded-full bg-brand-100 text-brand-500">推荐</span>}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="font-kids text-xl text-candy-orange">{reward.points} ⭐</span>
+                  <span className="font-kids text-xl text-candy-orange">{formatPoints(reward.points)} ⭐</span>
                   {reward.stock > 0 && (
                     <span className="text-xs text-warm-400">库存: {reward.remainingStock}/{reward.stock}</span>
                   )}
@@ -240,7 +241,7 @@ export default function AdminShopPage() {
                 <div className="min-w-0 flex-1">
                   <h3 className="font-semibold text-warm-800">{r.reward.name}</h3>
                   <p className="text-sm text-warm-400">
-                    {r.member.nickname} · {r.pointsSpent}⭐
+                    {r.member.nickname} · {formatPoints(r.pointsSpent)}⭐
                     {r.kidMessage && ` · "${r.kidMessage}"`}
                   </p>
                 </div>
