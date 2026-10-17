@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { createOutfit, updateOutfit, deleteOutfit, unlockOutfit } from "@/lib/actions/outfits"
+import { revivePet } from "@/lib/actions/pets"
 import { cn } from "@/lib/utils"
 import { CardSkeleton } from "@/components/ui/Skeleton"
 import { useToast } from "@/components/ui/ToastProvider"
@@ -45,6 +46,17 @@ type OutfitData = {
 type MemberInfo = {
   id: string
   nickname: string
+  pet: {
+    name: string
+    species: string
+    status: "ALIVE" | "CRITICAL" | "DEAD"
+    hunger: number
+    thirst: number
+    hygiene: number
+    energy: number
+    mood: number
+    deathReason: string | null
+  } | null
 }
 
 export default function AdminPetsPage() {
@@ -130,6 +142,17 @@ export default function AdminPetsPage() {
     }
   }
 
+  async function handleRevive(memberId: string) {
+    try {
+      await revivePet(memberId)
+      toast("宠物已经恢复啦！", "success")
+      fetchData()
+      router.refresh()
+    } catch (err: any) {
+      toast(err.message || "恢复失败", "error")
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -168,6 +191,51 @@ export default function AdminPetsPage() {
           error={error}
         />
       )}
+
+      <div className="bg-white rounded-xl shadow-card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="font-semibold text-warm-800">🐾 饲养状态</h2>
+            <p className="text-xs text-warm-400 mt-1">查看宠物状态，帮助濒危宠物恢复</p>
+          </div>
+        </div>
+        {members.length === 0 ? (
+          <p className="text-sm text-warm-400">还没有小朋友。</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {members.map((member) => {
+              const pet = member.pet
+              if (!pet) return <div key={member.id} className="rounded-xl bg-warm-50 p-3 text-sm text-warm-400">{member.nickname} 暂无宠物</div>
+              const needs = [pet.hunger, pet.thirst, pet.hygiene, pet.energy, pet.mood]
+              const lowest = Math.min(...needs)
+              const statusLabel = pet.status === "DEAD" ? "已死亡" : pet.status === "CRITICAL" ? "需要照顾" : "状态良好"
+              return (
+                <div key={member.id} className="rounded-xl border border-warm-100 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-warm-700">{member.nickname} · {pet.name}</p>
+                      <p className={cn("text-xs mt-1", pet.status === "DEAD" ? "text-candy-red" : pet.status === "CRITICAL" ? "text-candy-orange" : "text-candy-green")}>{statusLabel}</p>
+                    </div>
+                    {pet.status === "DEAD" && (
+                      <button onClick={() => handleRevive(member.id)} className="px-3 py-1.5 rounded-lg bg-admin-primary text-white text-xs font-semibold hover:brightness-110">✨ 恢复</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-5 gap-1 mt-3 text-center text-[10px] text-warm-400">
+                    {[["饱", pet.hunger], ["水", pet.thirst], ["洁", pet.hygiene], ["力", pet.energy], ["心", pet.mood]].map(([label, value]) => (
+                      <div key={label as string}>
+                        <div className={cn("font-semibold", Number(value) <= 25 ? "text-candy-red" : "text-warm-600")}>{value}</div>
+                        <div>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {pet.status === "DEAD" && pet.deathReason && <p className="text-xs text-candy-red mt-2">原因：{pet.deathReason}</p>}
+                  {lowest <= 25 && pet.status !== "DEAD" && <p className="text-xs text-candy-orange mt-2">这个宠物需要小朋友马上照顾。</p>}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       <div className="space-y-4">
         {outfits.length === 0 ? (

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { feedPet, dressPet, createPet } from "@/lib/actions/pets"
+import { dressPet, createPet } from "@/lib/actions/pets"
 import { cn } from "@/lib/utils"
 import { SPECIES_EMOJI, SPECIES_LABELS, STAGE_CONFIG, MOOD_EMOJIS } from "@/lib/constants"
 
@@ -22,6 +22,28 @@ type PetData = {
   mood: number
   currentOutfit: string | null
   lastFeedDate: string | null
+  hunger: number
+  thirst: number
+  hygiene: number
+  energy: number
+  status: "ALIVE" | "CRITICAL" | "DEAD"
+  deathAt: string | null
+  deathReason: string | null
+  lastFedAt: string | null
+  lastWateredAt: string | null
+  lastBathedAt: string | null
+  lastPlayedAt: string | null
+}
+
+type CareData = {
+  hunger: number
+  thirst: number
+  hygiene: number
+  energy: number
+  mood: number
+  status: "ALIVE" | "CRITICAL" | "DEAD"
+  warning: string
+  cooldowns: Record<string, number>
 }
 
 type OutfitData = {
@@ -44,8 +66,10 @@ export default function KidsPetPage() {
   const [currentStage, setCurrentStage] = useState("EGG")
   const [stageEmoji, setStageEmoji] = useState("🥚")
   const [speciesEmoji, setSpeciesEmoji] = useState<string | null>(null)
+  const [care, setCare] = useState<CareData | null>(null)
   const [loading, setLoading] = useState(true)
   const [feeding, setFeeding] = useState(false)
+  const [interacting, setInteracting] = useState<string | null>(null)
   const [dressing, setDressing] = useState<string | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showOutfits, setShowOutfits] = useState(false)
@@ -64,6 +88,7 @@ export default function KidsPetPage() {
       setCurrentStage(data.currentStage || "EGG")
       setStageEmoji(data.stageEmoji || "🥚")
       setSpeciesEmoji(data.speciesEmoji)
+      setCare(data.care || null)
       return data
     }
     return null
@@ -83,13 +108,25 @@ export default function KidsPetPage() {
     fetchData()
   }, [fetchData])
 
-  async function handleFeed() {
-    setFeeding(true)
+  async function handleInteraction(type: "FEED" | "DRINK" | "BATH" | "PLAY") {
+    setInteracting(type)
+    if (type === "FEED") setFeeding(true)
     try {
       const oldStage = currentStage
-      await feedPet()
+      const response = await fetch("/api/kids/pet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          idempotencyKey: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${type}-${Date.now()}`,
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "互动失败")
       const data = await fetchDataRaw()
       router.refresh()
+
+      if (result.justDied) toast("宠物需要家长帮忙恢复。", "error")
 
       const newStage = data?.currentStage || currentStage
       if (newStage !== oldStage) {
@@ -103,6 +140,7 @@ export default function KidsPetPage() {
     } catch (e: any) {
       toast(e.message || "互动失败", "error")
     } finally {
+      setInteracting(null)
       setFeeding(false)
     }
   }
@@ -169,11 +207,20 @@ export default function KidsPetPage() {
     return Math.min(100, Math.round(((totalPoints - currentThreshold) / range) * 100))
   }
 
-  const isFedToday = pet?.lastFeedDate
-    ? new Date(pet.lastFeedDate).toDateString() === new Date().toDateString()
-    : false
-
   const nextStage = getNextStage()
+
+  function formatCooldown(ms: number) {
+    if (!ms) return "现在可以"
+    const minutes = Math.ceil(ms / 60000)
+    if (minutes >= 60) return `${Math.ceil(minutes / 60)}小时后`
+    return `${minutes}分钟后`
+  }
+
+  function careColor(value: number) {
+    if (value >= 60) return "bg-candy-green"
+    if (value >= 30) return "bg-candy-orange"
+    return "bg-candy-red"
+  }
 
   if (loading) {
     return (
@@ -256,17 +303,31 @@ export default function KidsPetPage() {
           </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between text-xs text-warm-400 mb-1">
-            <span>心情</span>
-            <span>{pet?.mood || 0}/100</span>
-          </div>
-          <div className="h-3 bg-warm-100 rounded-full overflow-hidden">
-            <div
-              className={cn("h-full rounded-full transition-all duration-500", getMoodColor(pet?.mood || 0))}
-              style={{ width: `${pet?.mood || 0}%` }}
-            />
-          </div>
+        <div className={cn(
+          "rounded-xl px-3 py-2 text-sm",
+          care?.status === "DEAD" ? "bg-candy-red/10 text-candy-red" : care?.status === "CRITICAL" ? "bg-candy-orange/10 text-candy-orange" : "bg-candy-green/10 text-candy-green"
+        )}>
+          {care?.warning || "正在了解宠物状态..."}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            ["饱腹", care?.hunger ?? pet.hunger, "🍎"],
+            ["水分", care?.thirst ?? pet.thirst, "💧"],
+            ["清洁", care?.hygiene ?? pet.hygiene, "🛁"],
+            ["精力", care?.energy ?? pet.energy, "⚡"],
+            ["心情", care?.mood ?? pet.mood, getMoodEmoji(care?.mood ?? pet.mood)],
+          ].map(([label, value, emoji]) => (
+            <div key={label as string} className="rounded-xl bg-warm-50 px-3 py-2">
+              <div className="flex items-center justify-between text-xs text-warm-500 mb-1">
+                <span>{emoji} {label}</span>
+                <span>{value}/100</span>
+              </div>
+              <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
+                <div className={cn("h-full rounded-full transition-all duration-500", careColor(Number(value)))} style={{ width: `${value}%` }} />
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="flex items-center gap-4">
@@ -304,23 +365,34 @@ export default function KidsPetPage() {
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={handleFeed}
-            disabled={feeding || isFedToday}
-            className={cn(
-              "flex-1 h-12 rounded-btn font-kids font-bold text-base transition-all active:scale-95",
-              isFedToday
-                ? "bg-warm-100 text-warm-400 cursor-not-allowed"
-                : "bg-gradient-to-r from-candy-orange to-candy-pink text-white hover:brightness-110",
-              feeding && "animate-pulse"
-            )}
-          >
-            {isFedToday ? "✅ 今日已互动" : feeding ? "互动中..." : "🤗 互动一下"}
-          </button>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            ["FEED", "🍎", "喂食", "bg-candy-orange/10 text-candy-orange hover:bg-candy-orange/20"],
+            ["DRINK", "💧", "喝水", "bg-candy-blue/10 text-candy-blue hover:bg-candy-blue/20"],
+            ["BATH", "🛁", "洗澡", "bg-candy-purple/10 text-candy-purple hover:bg-candy-purple/20"],
+            ["PLAY", "🎾", "玩耍", "bg-candy-pink/10 text-candy-pink hover:bg-candy-pink/20"],
+          ] as const).map(([type, emoji, label, color]) => {
+            const cooldown = care?.cooldowns?.[type] || 0
+            const disabled = Boolean(interacting) || cooldown > 0 || care?.status === "DEAD"
+            return (
+              <button
+                key={type}
+                onClick={() => handleInteraction(type)}
+                disabled={disabled}
+                className={cn(
+                  "h-12 rounded-btn font-kids font-bold text-sm transition-all active:scale-95",
+                  disabled ? "bg-warm-100 text-warm-400 cursor-not-allowed" : color,
+                  interacting === type && "animate-pulse"
+                )}
+              >
+                {interacting === type ? "处理中..." : `${emoji} ${label}`}
+                {interacting !== type && cooldown > 0 && <span className="block text-[10px] font-normal">{formatCooldown(cooldown)}</span>}
+              </button>
+            )
+          })}
           <button
             onClick={() => setShowOutfits(!showOutfits)}
-            className="h-12 px-5 rounded-btn font-kids font-bold text-base bg-candy-purple/10 text-candy-purple hover:bg-candy-purple/20 transition-all active:scale-95"
+            className="col-span-2 h-10 rounded-btn font-kids font-bold text-sm bg-candy-purple/10 text-candy-purple hover:bg-candy-purple/20 transition-all active:scale-95"
           >
             👗 换装
           </button>

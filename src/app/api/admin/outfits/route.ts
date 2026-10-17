@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
+import { syncPetState } from "@/lib/actions/pets"
 
 export async function GET() {
   const session = await auth()
@@ -10,6 +11,12 @@ export async function GET() {
     where: { userId: session.user.id },
   })
   if (!member) return NextResponse.json({ error: "No family" }, { status: 404 })
+
+  const kidIds = await prisma.familyMember.findMany({
+    where: { familyId: member.familyId, role: "KID" },
+    select: { id: true },
+  })
+  await Promise.all(kidIds.map((kid) => syncPetState(kid.id)))
 
   const [outfits, familyMembers, grants] = await Promise.all([
     prisma.petOutfit.findMany({
@@ -23,7 +30,11 @@ export async function GET() {
     }),
     prisma.familyMember.findMany({
       where: { familyId: member.familyId, role: "KID" },
-      select: { id: true, nickname: true, pet: { select: { species: true, name: true, currentOutfit: true } } },
+      select: {
+        id: true,
+        nickname: true,
+        pet: { select: { species: true, name: true, currentOutfit: true, status: true, hunger: true, thirst: true, hygiene: true, energy: true, mood: true, deathReason: true } },
+      },
     }),
     prisma.petOutfitGrant.findMany({
       where: { member: { familyId: member.familyId } },
@@ -62,6 +73,7 @@ export async function GET() {
     members: familyMembers.map((m) => ({
       id: m.id,
       nickname: m.nickname,
+      pet: m.pet,
     })),
   })
 }

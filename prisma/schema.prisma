@@ -137,6 +137,22 @@ enum PetStage {
   ULTIMATE             // 👑 完全体
 }
 
+// ── 宠物饲养状态 ──
+enum PetStatus {
+  ALIVE                // 健康存活
+  CRITICAL             // 需要马上照顾
+  DEAD                 // 已死亡，等待恢复
+}
+
+enum PetInteractionType {
+  FEED                 // 喂食
+  DRINK                // 喝水
+  BATH                 // 洗澡
+  PLAY                 // 玩耍
+  REST                 // 休息
+  REVIVE               // 家长恢复
+}
+
 // ── 通知类型 ──
 enum NotificationType {
   TASK_COMPLETED       // 小朋友完成任务 (通知家长)
@@ -281,6 +297,7 @@ model FamilyMember {
   achievements    AchievementGrant[]
   notifications   Notification[]
   petOutfits      PetOutfitGrant[]
+  petInteractions PetInteraction[]
   comments        Comment[]
   themeSkins      ThemeSkin[]
   dailyStats      DailyStats[]
@@ -575,16 +592,53 @@ model Pet {
   stage        PetStage  @default(EGG)
   mood         Int       @default(100)          // 心情值 (0-100)
 
+  // 饲养状态 (0-100，数值越高状态越好)
+  hunger        Int       @default(100)          // 饱腹度
+  thirst        Int       @default(100)          // 水分
+  hygiene       Int       @default(100)          // 清洁度
+  energy        Int       @default(100)          // 精力
+  status        PetStatus @default(ALIVE)
+  deathAt       DateTime?
+  deathReason   String?
+  criticalSince DateTime?
+
   // 时间追踪
   lastFeedDate DateTime?                       // 上次互动日期
   lastMoodUpdate DateTime?                     // 上次心情更新
+  lastSimulatedAt DateTime @default(now())     // 上次推进饲养状态的时间
+  lastFedAt     DateTime?                      // 上次喂食
+  lastWateredAt DateTime?                      // 上次喝水
+  lastBathedAt  DateTime?                      // 上次洗澡
+  lastPlayedAt  DateTime?                      // 上次玩耍
 
   // 装扮
   currentOutfit String?                       // 当前装备的装扮ID
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  interactions PetInteraction[]
+
   @@map("pets")
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  🐾 宠物互动记录
+// ──────────────────────────────────────────────────────────────────────────────
+model PetInteraction {
+  id             String              @id @default(uuid())
+  petId          String
+  pet            Pet                 @relation(fields: [petId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         FamilyMember        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  type           PetInteractionType
+  idempotencyKey String?
+  effects        String?
+  createdAt      DateTime            @default(now())
+
+  @@unique([petId, idempotencyKey])
+  @@index([petId, createdAt])
+  @@index([memberId, createdAt])
+  @@map("pet_interactions")
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
