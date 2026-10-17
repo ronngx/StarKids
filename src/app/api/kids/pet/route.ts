@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { NextResponse } from "next/server"
 import { normalizePoints } from "@/lib/points"
 import { SPECIES_EMOJI, STAGE_CONFIG } from "@/lib/constants"
-import { getPetCareWarning, getRemainingCooldown, PET_INTERACTION_CONFIG } from "@/lib/pet-care"
+import { getPetCareWarning, getRemainingCooldown, parsePetInteractionCosts, PET_INTERACTION_CONFIG } from "@/lib/pet-care"
 import { interactWithPet, syncPetState } from "@/lib/actions/pets"
 import type { PetInteractionType } from "@prisma/client"
 
@@ -18,7 +18,7 @@ export async function GET() {
   if (!member) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const pet = await syncPetState(member.id)
-  const [outfits, grants, totalEarned] = await Promise.all([
+  const [outfits, grants, totalEarned, pointConfig] = await Promise.all([
     prisma.petOutfit.findMany({
       where: { OR: [{ familyId: member.familyId }, { familyId: null }] },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -28,6 +28,7 @@ export async function GET() {
       where: { memberId: member.id, status: "APPROVED" },
       _sum: { pointsEarned: true },
     }),
+    prisma.pointConfig.findUnique({ where: { familyId: member.familyId }, select: { petInteractionCosts: true } }),
   ])
 
   const unlockedOutfitIds = new Set(grants.map((g) => g.outfitId))
@@ -53,6 +54,8 @@ export async function GET() {
     outfits,
     unlockedOutfitIds: Array.from(unlockedOutfitIds),
     totalPoints,
+    balance: normalizePoints(member.currentPoints),
+    interactionCosts: parsePetInteractionCosts(pointConfig?.petInteractionCosts),
     currentStage,
     stageEmoji: STAGE_CONFIG[currentStage]?.emoji || "🥚",
     speciesEmoji: pet ? SPECIES_EMOJI[pet.species] || "🐱" : null,

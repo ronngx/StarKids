@@ -1,4 +1,5 @@
 import type { PetInteractionType, PetStatus } from "@prisma/client"
+import { normalizePoints } from "@/lib/points"
 
 /**
  * Pet care is deliberately kept as a pure, server-side domain module. The page
@@ -7,6 +8,39 @@ import type { PetInteractionType, PetStatus } from "@prisma/client"
 
 export const PET_CARE_WARNING_LEVEL = 25
 export const PET_DEATH_GRACE_HOURS = 24
+
+export const PUBLIC_PET_INTERACTIONS = ["FEED", "DRINK", "BATH", "PLAY"] as const
+export type PublicPetInteraction = (typeof PUBLIC_PET_INTERACTIONS)[number]
+export type PetInteractionCosts = Record<PublicPetInteraction, number>
+
+export const DEFAULT_PET_INTERACTION_COSTS: PetInteractionCosts = {
+  FEED: 0,
+  DRINK: 0,
+  BATH: 0,
+  PLAY: 0,
+}
+
+export const DEFAULT_PET_INTERACTION_COSTS_JSON = JSON.stringify(DEFAULT_PET_INTERACTION_COSTS)
+
+export function parsePetInteractionCosts(value: string | null | undefined): PetInteractionCosts {
+  let parsed: unknown = null
+  if (value) {
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      parsed = null
+    }
+  }
+
+  const source = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {}
+  return Object.fromEntries(
+    PUBLIC_PET_INTERACTIONS.map((type) => {
+      const raw = source[type]
+      const cost = typeof raw === "number" ? raw : Number(raw)
+      return [type, Number.isFinite(cost) && cost >= 0 ? normalizePoints(cost) : 0]
+    })
+  ) as PetInteractionCosts
+}
 
 export const PET_INTERACTION_CONFIG: Record<
   PetInteractionType,

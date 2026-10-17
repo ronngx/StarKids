@@ -46,6 +46,8 @@ type CareData = {
   cooldowns: Record<string, number>
 }
 
+type InteractionCosts = Record<"FEED" | "DRINK" | "BATH" | "PLAY", number>
+
 type OutfitData = {
   id: string
   name: string
@@ -66,6 +68,8 @@ export default function KidsPetPage() {
   const [currentStage, setCurrentStage] = useState("EGG")
   const [stageEmoji, setStageEmoji] = useState("🥚")
   const [speciesEmoji, setSpeciesEmoji] = useState<string | null>(null)
+  const [balance, setBalance] = useState(0)
+  const [interactionCosts, setInteractionCosts] = useState<InteractionCosts>({ FEED: 0, DRINK: 0, BATH: 0, PLAY: 0 })
   const [care, setCare] = useState<CareData | null>(null)
   const [loading, setLoading] = useState(true)
   const [feeding, setFeeding] = useState(false)
@@ -89,6 +93,8 @@ export default function KidsPetPage() {
       setStageEmoji(data.stageEmoji || "🥚")
       setSpeciesEmoji(data.speciesEmoji)
       setCare(data.care || null)
+      setBalance(data.balance || 0)
+      setInteractionCosts({ FEED: 0, DRINK: 0, BATH: 0, PLAY: 0, ...(data.interactionCosts || {}) })
       return data
     }
     return null
@@ -297,6 +303,7 @@ export default function KidsPetPage() {
             <p className="text-xs text-warm-400 mt-0.5">
               {STAGE_CONFIG[currentStage]?.label || "蛋宝宝"} · {speciesEmoji || "🐱"}
             </p>
+            <p className="text-xs text-brand-500 mt-1">当前积分：{formatPoints(balance)}⭐</p>
           </div>
           <div className="text-right">
             <p className="text-3xl">{getMoodEmoji(pet?.mood || 0)}</p>
@@ -373,7 +380,9 @@ export default function KidsPetPage() {
             ["PLAY", "🎾", "玩耍", "bg-candy-pink/10 text-candy-pink hover:bg-candy-pink/20"],
           ] as const).map(([type, emoji, label, color]) => {
             const cooldown = care?.cooldowns?.[type] || 0
-            const disabled = Boolean(interacting) || cooldown > 0 || care?.status === "DEAD"
+            const cost = interactionCosts[type]
+            const insufficient = balance < cost
+            const disabled = Boolean(interacting) || cooldown > 0 || care?.status === "DEAD" || insufficient
             return (
               <button
                 key={type}
@@ -386,7 +395,10 @@ export default function KidsPetPage() {
                 )}
               >
                 {interacting === type ? "处理中..." : `${emoji} ${label}`}
-                {interacting !== type && cooldown > 0 && <span className="block text-[10px] font-normal">{formatCooldown(cooldown)}</span>}
+                {interacting !== type && insufficient && <span className="block text-[10px] font-normal">积分不足</span>}
+                {interacting !== type && !insufficient && cost > 0 && <span className="block text-[10px] font-normal">消耗 {formatPoints(cost)}⭐</span>}
+                {interacting !== type && !insufficient && cost === 0 && cooldown > 0 && <span className="block text-[10px] font-normal">{formatCooldown(cooldown)}</span>}
+                {interacting !== type && !insufficient && cost > 0 && cooldown > 0 && <span className="block text-[10px] font-normal">{formatCooldown(cooldown)}</span>}
               </button>
             )
           })}

@@ -3,11 +3,13 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
-import { normalizePoints } from "@/lib/points"
+import { formatPoints, normalizePoints } from "@/lib/points"
 import type { PetInteractionType, PetSpecies, PetStage } from "@prisma/client"
 import { STAGE_CONFIG } from "@/lib/constants"
 import {
   PET_INTERACTION_CONFIG,
+  parsePetInteractionCosts,
+  type PublicPetInteraction,
   advancePetState,
   applyInteraction,
   getRemainingCooldown,
@@ -88,7 +90,16 @@ export async function interactWithPet(type: string, idempotencyKey?: string) {
 
     if (idempotencyKey) {
       const duplicate = await tx.petInteraction.findFirst({ where: { petId: pet.id, idempotencyKey } })
-      if (duplicate) return { pet, applied: false, duplicate: true, justDied: false }
+      if (duplicate) {
+        return {
+          pet,
+          applied: false,
+          duplicate: true,
+          justDied: false,
+          pointsCost: 0,
+          balanceAfter: normalizePoints(member.currentPoints),
+        }
+      }
     }
 
     const advanced = advancePetState(pet, now)
@@ -96,7 +107,16 @@ export async function interactWithPet(type: string, idempotencyKey?: string) {
       ? await tx.pet.update({ where: { id: pet.id }, data: careUpdate(advanced) })
       : pet
 
-    if (advanced.justDied) return { pet: syncedPet, applied: false, duplicate: false, justDied: true }
+    if (advanced.justDied) {
+      return {
+        pet: syncedPet,
+        applied: false,
+        duplicate: false,
+        justDied: true,
+        pointsCost: 0,
+        balanceAfter: normalizePoints(member.currentPoints),
+      }
+    }
     if (syncedPet.status === "DEAD") throw new Error("宠物已经睡着了，请联系家长帮忙恢复。")
 
     const config = PET_INTERACTION_CONFIG[interactionType]
@@ -105,6 +125,29 @@ export async function interactWithPet(type: string, idempotencyKey?: string) {
     if (remaining > 0) throw new Error(`${config.label}还需要等待约 ${Math.ceil(remaining / 60000)} 分钟。`)
     if (interactionType === "PLAY" && syncedPet.energy < 20) {
       throw new Error("宠物太累了，先让它休息一会儿吧。")
+    }
+
+    const pointConfig = await tx.pointConfig.findUnique({ where: { familyId: member.familyId } })
+    const interactionCost = parsePetInteractionCosts(pointConfig?.petInteractionCosts)[interactionType as PublicPetInteraction]
+    let balanceAfter = normalizePoints(member.currentPoints)
+    if (interactionCost > 0) {
+      const deducted = await tx.familyMember.updateMany({
+        where: { id: member.id, currentPoints: { gte: interactionCost } },
+        data: { currentPoints: { decrement: interactionCost } },
+      })
+      if (deducted.count !== 1) {
+        const current = await tx.familyMember.findUnique({
+          where: { id: member.id },
+          select: { currentPoints: true },
+        })
+        const balance = normalizePoints(current?.currentPoints)
+        throw new Error(`积分不足！需要 ${formatPoints(interactionCost)}⭐，当前 ${formatPoints(balance)}⭐`)
+      }
+      const updatedMember = await tx.familyMember.findUnique({
+        where: { id: member.id },
+        select: { currentPoints: true },
+      })
+      balanceAfter = normalizePoints(updatedMember?.currentPoints)
     }
 
     const next = applyInteraction(syncedPet, interactionType, now)
@@ -125,11 +168,18 @@ export async function interactWithPet(type: string, idempotencyKey?: string) {
         memberId: member.id,
         type: interactionType,
         idempotencyKey: idempotencyKey || null,
-        effects: JSON.stringify(config.effects),
+        effects: JSON.stringify({ ...config.effects, pointsCost: interactionCost, balanceAfter }),
       },
     })
 
-    return { pet: updated, applied: true, duplicate: false, justDied: false }
+    return {
+      pet: updated,
+      applied: true,
+      duplicate: false,
+      justDied: false,
+      pointsCost: interactionCost,
+      balanceAfter,
+    }
   })
 
   revalidatePath("/kids/pet")

@@ -9,6 +9,15 @@ import { CardSkeleton } from "@/components/ui/Skeleton"
 import { useToast } from "@/components/ui/ToastProvider"
 import { formatPoints } from "@/lib/points"
 
+const INTERACTION_COST_OPTIONS = [
+  { type: "FEED", emoji: "🍎", label: "喂食" },
+  { type: "DRINK", emoji: "💧", label: "喝水" },
+  { type: "BATH", emoji: "🛁", label: "洗澡" },
+  { type: "PLAY", emoji: "🎾", label: "玩耍" },
+] as const
+
+type InteractionCosts = Record<(typeof INTERACTION_COST_OPTIONS)[number]["type"], number>
+
 const SPECIES_OPTIONS = [
   { value: "ALL", label: "全部适用", emoji: "🐾" },
   { value: "CAT", label: "小猫", emoji: "🐱" },
@@ -69,14 +78,24 @@ export default function AdminPetsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<OutfitData | null>(null)
   const [grantDialog, setGrantDialog] = useState<{ outfitId: string; outfitName: string; points: number } | null>(null)
+  const [interactionCosts, setInteractionCosts] = useState<InteractionCosts>({ FEED: 0, DRINK: 0, BATH: 0, PLAY: 0 })
+  const [savingCosts, setSavingCosts] = useState(false)
+  const [costMessage, setCostMessage] = useState("")
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/outfits")
-      if (res.ok) {
-        const data = await res.json()
+      const [outfitRes, costRes] = await Promise.all([
+        fetch("/api/admin/outfits"),
+        fetch("/api/admin/pets/config"),
+      ])
+      if (outfitRes.ok) {
+        const data = await outfitRes.json()
         setOutfits(data.outfits || [])
         setMembers(data.members || [])
+      }
+      if (costRes.ok) {
+        const data = await costRes.json()
+        setInteractionCosts({ FEED: 0, DRINK: 0, BATH: 0, PLAY: 0, ...(data.petInteractionCosts || {}) })
       }
     } catch (e) {
       console.error(e)
@@ -84,6 +103,25 @@ export default function AdminPetsPage() {
       setLoading(false)
     }
   }, [])
+
+  async function handleSaveCosts(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setSavingCosts(true)
+    setCostMessage("")
+    const formData = new FormData(e.currentTarget)
+    try {
+      const res = await fetch("/api/admin/pets/config", { method: "POST", body: formData })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "保存失败")
+      setInteractionCosts({ FEED: 0, DRINK: 0, BATH: 0, PLAY: 0, ...(data.petInteractionCosts || {}) })
+      setCostMessage("✅ 互动积分设置已保存")
+      router.refresh()
+    } catch (err: any) {
+      setCostMessage(`❌ ${err.message || "保存失败"}`)
+    } finally {
+      setSavingCosts(false)
+    }
+  }
 
   useEffect(() => {
     fetchData()
@@ -191,6 +229,47 @@ export default function AdminPetsPage() {
           error={error}
         />
       )}
+
+      <form onSubmit={handleSaveCosts} className="bg-white rounded-xl shadow-card p-5 space-y-4">
+        <div>
+          <h2 className="font-semibold text-warm-800">⭐ 互动积分设置</h2>
+          <p className="text-xs text-warm-400 mt-1">设置小朋友照顾宠物时消耗的积分，填写 0 表示免费。</p>
+        </div>
+        {costMessage && (
+          <div className={cn(
+            "text-sm rounded-xl p-3",
+            costMessage.startsWith("✅") ? "bg-candy-green/10 text-candy-green" : "bg-candy-red/10 text-candy-red"
+          )}>
+            {costMessage}
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {INTERACTION_COST_OPTIONS.map((option) => (
+            <label key={option.type} className="flex items-center justify-between gap-3 rounded-xl bg-warm-50 p-3">
+              <span className="text-sm font-medium text-warm-700">{option.emoji} {option.label}</span>
+              <span className="flex items-center gap-2">
+                <input
+                  name={option.type}
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={interactionCosts[option.type]}
+                  onChange={(e) => setInteractionCosts((current) => ({ ...current, [option.type]: Number(e.target.value) || 0 }))}
+                  className="w-24 h-9 px-3 rounded-lg border border-warm-200 text-sm text-right"
+                />
+                <span className="text-sm text-warm-400">⭐</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <button
+          type="submit"
+          disabled={savingCosts}
+          className="h-10 px-5 bg-admin-primary text-white rounded-xl text-sm font-semibold hover:brightness-110 transition-all disabled:opacity-50"
+        >
+          {savingCosts ? "保存中..." : "保存互动积分"}
+        </button>
+      </form>
 
       <div className="bg-white rounded-xl shadow-card p-5">
         <div className="flex items-center justify-between mb-3">

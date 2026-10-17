@@ -793,6 +793,9 @@ model PointConfig {
   dailyCap      Float    @default(0)            // 每日积分上限 (0=不限)，最多两位小数
   resetType     String   @default("NONE")       // NONE / MONTHLY / YEARLY / SEMESTER
 
+  // 宠物互动消耗 (JSON，0=免费，最多两位小数)
+  petInteractionCosts String @default("{\"FEED\":0,\"DRINK\":0,\"BATH\":0,\"PLAY\":0}")
+
   // 连续奖励 (JSON)
   // 示例: [3, 7, 14, 30] → 连续3天+10, 7天+50, 14天+100, 30天+300
   streakBonuses String     @default("[{\"days\":3,\"points\":10},{\"days\":7,\"points\":50},{\"days\":14,\"points\":100},{\"days\":30,\"points\":300}]")
