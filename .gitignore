@@ -5,3 +5,6 @@ node_modules
 .env.*.local
 *.db
 *.db-journal
+data_bak/*_snapshot_*.json
+data_bak/*_cutover_*.json
+data_bak/*_report.json

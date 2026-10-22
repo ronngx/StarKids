@@ -1,8 +1,7 @@
 -- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL PRIMARY KEY,
-    "email" TEXT NOT NULL,
-    "emailVerified" DATETIME,
+    "username" TEXT NOT NULL,
     "name" TEXT,
     "passwordHash" TEXT,
     "role" TEXT NOT NULL DEFAULT 'PARENT',
@@ -39,7 +38,7 @@ CREATE TABLE "family_members" (
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    "currentPoints" INTEGER NOT NULL DEFAULT 0,
+    "currentPoints" REAL NOT NULL DEFAULT 0,
     CONSTRAINT "family_members_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "families" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "family_members_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -56,7 +55,7 @@ CREATE TABLE "tasks" (
     "type" TEXT NOT NULL DEFAULT 'DAILY',
     "frequency" TEXT NOT NULL DEFAULT 'MANUAL',
     "difficulty" TEXT NOT NULL DEFAULT 'MEDIUM',
-    "points" INTEGER NOT NULL DEFAULT 5,
+    "points" REAL NOT NULL DEFAULT 5,
     "autoApprove" BOOLEAN NOT NULL DEFAULT false,
     "maxDaily" INTEGER NOT NULL DEFAULT 1,
     "weekDays" TEXT NOT NULL DEFAULT '[1,2,3,4,5]',
@@ -83,7 +82,7 @@ CREATE TABLE "task_templates" (
     "type" TEXT NOT NULL DEFAULT 'DAILY',
     "frequency" TEXT NOT NULL DEFAULT 'DAILY',
     "difficulty" TEXT NOT NULL DEFAULT 'MEDIUM',
-    "points" INTEGER NOT NULL DEFAULT 10,
+    "points" REAL NOT NULL DEFAULT 10,
     "autoApprove" BOOLEAN NOT NULL DEFAULT false,
     "maxDaily" INTEGER NOT NULL DEFAULT 1,
     "weekDays" TEXT NOT NULL DEFAULT '[1,2,3,4,5]',
@@ -99,7 +98,7 @@ CREATE TABLE "task_completions" (
     "taskId" TEXT NOT NULL,
     "memberId" TEXT NOT NULL,
     "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "pointsEarned" INTEGER NOT NULL DEFAULT 0,
+    "pointsEarned" REAL NOT NULL DEFAULT 0,
     "status" TEXT NOT NULL DEFAULT 'PENDING',
     "approvedBy" TEXT,
     "approvedAt" DATETIME,
@@ -120,7 +119,7 @@ CREATE TABLE "rewards" (
     "image" TEXT,
     "category" TEXT NOT NULL,
     "tags" TEXT NOT NULL DEFAULT '[]',
-    "points" INTEGER NOT NULL,
+    "points" REAL NOT NULL,
     "stock" INTEGER NOT NULL DEFAULT 0,
     "remainingStock" INTEGER NOT NULL DEFAULT 0,
     "maxPerPerson" INTEGER NOT NULL DEFAULT 0,
@@ -138,7 +137,7 @@ CREATE TABLE "reward_redemptions" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "rewardId" TEXT NOT NULL,
     "memberId" TEXT NOT NULL,
-    "pointsSpent" INTEGER NOT NULL,
+    "pointsSpent" REAL NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'PENDING',
     "kidMessage" TEXT,
     "parentNote" TEXT,
@@ -155,12 +154,12 @@ CREATE TABLE "reward_redemptions" (
 CREATE TABLE "point_logs" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "memberId" TEXT NOT NULL,
-    "amount" INTEGER NOT NULL,
+    "amount" REAL NOT NULL,
     "reason" TEXT NOT NULL,
     "referenceId" TEXT,
     "referenceType" TEXT,
     "note" TEXT,
-    "balanceAfter" INTEGER NOT NULL,
+    "balanceAfter" REAL NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "point_logs_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "family_members" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -175,7 +174,7 @@ CREATE TABLE "achievements" (
     "icon" TEXT NOT NULL,
     "category" TEXT NOT NULL DEFAULT 'SPECIAL',
     "condition" TEXT NOT NULL,
-    "bonusPoints" INTEGER NOT NULL DEFAULT 0,
+    "bonusPoints" REAL NOT NULL DEFAULT 0,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "isHidden" BOOLEAN NOT NULL DEFAULT false,
@@ -201,15 +200,41 @@ CREATE TABLE "pets" (
     "memberId" TEXT NOT NULL,
     "species" TEXT NOT NULL,
     "name" TEXT NOT NULL DEFAULT '小宝贝',
-    "level" INTEGER NOT NULL DEFAULT 0,
+    "level" REAL NOT NULL DEFAULT 0,
     "stage" TEXT NOT NULL DEFAULT 'EGG',
     "mood" INTEGER NOT NULL DEFAULT 100,
+    "hunger" INTEGER NOT NULL DEFAULT 100,
+    "thirst" INTEGER NOT NULL DEFAULT 100,
+    "hygiene" INTEGER NOT NULL DEFAULT 100,
+    "energy" INTEGER NOT NULL DEFAULT 100,
+    "status" TEXT NOT NULL DEFAULT 'ALIVE',
+    "deathAt" DATETIME,
+    "deathReason" TEXT,
+    "criticalSince" DATETIME,
     "lastFeedDate" DATETIME,
     "lastMoodUpdate" DATETIME,
+    "lastSimulatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastFedAt" DATETIME,
+    "lastWateredAt" DATETIME,
+    "lastBathedAt" DATETIME,
+    "lastPlayedAt" DATETIME,
     "currentOutfit" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "pets_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "family_members" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "pet_interactions" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "petId" TEXT NOT NULL,
+    "memberId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "idempotencyKey" TEXT,
+    "effects" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "pet_interactions_petId_fkey" FOREIGN KEY ("petId") REFERENCES "pets" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "pet_interactions_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "family_members" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -220,7 +245,7 @@ CREATE TABLE "pet_outfits" (
     "description" TEXT,
     "image" TEXT,
     "species" TEXT,
-    "points" INTEGER NOT NULL DEFAULT 0,
+    "points" REAL NOT NULL DEFAULT 0,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -232,7 +257,7 @@ CREATE TABLE "pet_outfit_grants" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "outfitId" TEXT NOT NULL,
     "memberId" TEXT NOT NULL,
-    "pointsSpent" INTEGER NOT NULL DEFAULT 0,
+    "pointsSpent" REAL NOT NULL DEFAULT 0,
     "unlockedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "pet_outfit_grants_outfitId_fkey" FOREIGN KEY ("outfitId") REFERENCES "pet_outfits" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "pet_outfit_grants_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "family_members" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -301,8 +326,9 @@ CREATE TABLE "point_configs" (
     "weekendDouble" BOOLEAN NOT NULL DEFAULT false,
     "birthdayTriple" BOOLEAN NOT NULL DEFAULT false,
     "enableDeduction" BOOLEAN NOT NULL DEFAULT false,
-    "dailyCap" INTEGER NOT NULL DEFAULT 0,
+    "dailyCap" REAL NOT NULL DEFAULT 0,
     "resetType" TEXT NOT NULL DEFAULT 'NONE',
+    "petInteractionCosts" TEXT NOT NULL DEFAULT '{"FEED":0,"DRINK":0,"BATH":0,"PLAY":0}',
     "streakBonuses" TEXT NOT NULL DEFAULT '[{"days":3,"points":10},{"days":7,"points":50},{"days":14,"points":100},{"days":30,"points":300}]',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -315,7 +341,7 @@ CREATE TABLE "theme_skins" (
     "familyId" TEXT NOT NULL,
     "memberId" TEXT,
     "skin" TEXT NOT NULL,
-    "points" INTEGER NOT NULL DEFAULT 0,
+    "points" REAL NOT NULL DEFAULT 0,
     "isUnlocked" BOOLEAN NOT NULL DEFAULT false,
     "isDefault" BOOLEAN NOT NULL DEFAULT false,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -332,8 +358,8 @@ CREATE TABLE "daily_stats" (
     "tasksAssigned" INTEGER NOT NULL DEFAULT 0,
     "tasksCompleted" INTEGER NOT NULL DEFAULT 0,
     "tasksApproved" INTEGER NOT NULL DEFAULT 0,
-    "pointsEarned" INTEGER NOT NULL DEFAULT 0,
-    "pointsSpent" INTEGER NOT NULL DEFAULT 0,
+    "pointsEarned" REAL NOT NULL DEFAULT 0,
+    "pointsSpent" REAL NOT NULL DEFAULT 0,
     "redemptions" INTEGER NOT NULL DEFAULT 0,
     "streak" INTEGER NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -348,8 +374,8 @@ CREATE TABLE "weekly_stats" (
     "weekEnd" DATETIME NOT NULL,
     "tasksCompleted" INTEGER NOT NULL DEFAULT 0,
     "tasksCompletedRate" REAL NOT NULL DEFAULT 0,
-    "pointsEarned" INTEGER NOT NULL DEFAULT 0,
-    "pointsSpent" INTEGER NOT NULL DEFAULT 0,
+    "pointsEarned" REAL NOT NULL DEFAULT 0,
+    "pointsSpent" REAL NOT NULL DEFAULT 0,
     "redemptions" INTEGER NOT NULL DEFAULT 0,
     "achievements" INTEGER NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -365,7 +391,7 @@ CREATE TABLE "_TaskAssignees" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "families_inviteCode_key" ON "families"("inviteCode");
@@ -441,6 +467,15 @@ CREATE UNIQUE INDEX "achievement_grants_achievementId_memberId_key" ON "achievem
 
 -- CreateIndex
 CREATE UNIQUE INDEX "pets_memberId_key" ON "pets"("memberId");
+
+-- CreateIndex
+CREATE INDEX "pet_interactions_petId_createdAt_idx" ON "pet_interactions"("petId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "pet_interactions_memberId_createdAt_idx" ON "pet_interactions"("memberId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "pet_interactions_petId_idempotencyKey_key" ON "pet_interactions"("petId", "idempotencyKey");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "pet_outfit_grants_outfitId_memberId_key" ON "pet_outfit_grants"("outfitId", "memberId");

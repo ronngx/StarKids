@@ -1172,11 +1172,11 @@ enum NotifType {
 | **样式** | Tailwind CSS 4.x | 原子化 CSS |
 | **UI 组件** | shadcn/ui + Framer Motion | 流畅动画 |
 | **编辑器** | — | 家长端需要文本编辑 |
-| **数据库** | PostgreSQL 16 + Prisma 6 | 主存储 |
+| **数据库** | SQLite + Prisma 7 | 主存储 |
 | **缓存** | Redis (Upstash) | 通知 + 会话 |
 | **文件上传** | UploadThing / Cloudflare R2 | 图片存储 |
 | **认证** | Auth.js v5 (Credentials) | 用户名 + 密码登录 |
-| **部署** | Vercel + Neon (PostgreSQL) | 全托管 |
+| **部署** | Node.js 应用服务器 | 运行 Next.js 应用 |
 | **推送** | Web Push API / 微信模板消息 | 通知推送 |
 | **动画库** | Framer Motion + Lottie | 丰富动效 |
 | **图表** | Recharts | 统计数据可视化 |
@@ -1243,7 +1243,6 @@ enum NotifType {
 #### Phase 0: 初始化 (W1)
 - [ ] Next.js 15 项目创建 (TS + Tailwind + App Router)
 - [ ] 安装 shadcn/ui + Framer Motion + Recharts
-- [ ] Docker Compose 环境 (PostgreSQL + Redis)
 - [ ] Prisma ORM 初始化 + 完整 Schema
 - [ ] Auth.js v5 认证配置
 - [ ] 卡通风格主题配置 (Tailwind 主题色 + 字体)
@@ -1398,7 +1397,7 @@ enum NotifType {
 | UI 组件库 | Storybook |
 | 数据库 Schema | Prisma Schema |
 | API 文档 | Swagger/OpenAPI |
-| 部署文档 | Docker + Vercel |
+| 部署文档 | Node.js 应用服务器 |
 | 用户使用手册 | 家长指南 |
 
 ---

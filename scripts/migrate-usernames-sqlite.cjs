@@ -1,5 +1,4 @@
 // Upgrade an existing local SQLite database before running prisma db push.
-// Docker/PostgreSQL uses the versioned Prisma migration instead.
 const Database = require("better-sqlite3");
 const { existsSync } = require("node:fs");
 const { resolve } = require("node:path");

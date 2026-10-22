@@ -8,7 +8,6 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-7.8-2D3748?logo=prisma)](https://www.prisma.io/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.2-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://www.docker.com/)
 
 ---
 
@@ -19,7 +18,7 @@
 - [技术栈 / Tech Stack](#-技术栈--tech-stack)
 - [项目结构 / Project Structure](#-项目结构--project-structure)
 - [快速开始 / Quick Start](#-快速开始--quick-start)
-- [Docker 部署 / Docker Deployment](#-docker-部署--docker-deployment)
+- [生产运行 / Production](#-生产运行--production)
 - [数据库 / Database](#-数据库--database)
 - [API 接口 / API Endpoints](#-api-接口--api-endpoints)
 - [环境变量 / Environment Variables](#-环境变量--environment-variables)
@@ -164,9 +163,6 @@ kids-flow/
 │   │   └── utils.ts            # 工具函数
 │   ├── auth.ts                 # NextAuth 配置
 │   └── middleware.ts           # 路由中间件
-├── docker/                     # Docker 配置
-├── Dockerfile                  # 多阶段构建
-├── docker-compose.yml          # 服务编排
 └── package.json
 ```
 
@@ -189,10 +185,15 @@ cd kids-flow
 # 2. 安装依赖 / Install dependencies
 npm install
 
+# 配置认证密钥及应用地址 / Configure auth secret and application URL
+cp .env.example .env.local
+# 编辑 .env.local，设置随机 AUTH_SECRET；可用 openssl rand -base64 32 生成
+
 # 3. 生成 Prisma 客户端 / Generate Prisma client
 npm run db:generate
 
 # 4. 初始化数据库 / Initialize database
+touch dev.db
 npm run db:push
 
 # 5. (可选) 填充种子数据 / (Optional) Seed the database
@@ -220,75 +221,35 @@ Open your browser at [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 🐳 Docker 部署 / Docker Deployment
+## 🚀 生产运行 / Production
 
-### 一键部署 / One-Click Deploy
-
-```bash
-# 本地构建应用镜像并启动所有服务 / Build the app image locally and start all services
-docker compose up -d --build
-
-# 或使用部署脚本 / Or use the deployment script
-bash docker-deploy.sh
-
-# 查看日志 / View logs
-docker compose logs -f
-
-# 停止服务 / Stop services
-docker compose down
-```
-
-### 服务架构 / Service Architecture
-
-| 服务 Service | 镜像 Image | 端口 Port | 说明 Description |
-|-------------|-----------|-----------|------------------|
-| `app` | 本地构建 `starkids-app:local` | `3000` | Next.js 应用 |
-| `db` | `postgres:17-alpine` | `5432` | PostgreSQL 数据库 |
-
-### Dockerfile 特性 / Dockerfile Features
-
-- **多阶段构建**：分离依赖安装、构建、运行阶段，最小化镜像体积
-- **PostgreSQL 适配**：构建时自动切换数据库 Provider
-- **健康检查**：数据库就绪后才启动应用
-- **非 root 用户**：以 `nextjs` 用户运行，提升安全性
-- **增量构建缓存**：使用 BuildKit 持久保存 npm 下载缓存和 Next.js 编译缓存，源码更新后可继续复用
-- **本地字体**：随项目托管 Noto Sans SC 和 ZCOOL KuaiLe，构建无需下载 Google 字体；保留按字形范围加载和原字体许可
-- **独立 Prisma 缓存层**：只在 Prisma 文件或依赖变化时重新生成 Client，普通页面修改会跳过该步骤
-- **复用依赖安装**：生产依赖从完整依赖中裁剪，避免重复安装并编译原生模块
-- **运行时认证配置**：`AUTH_SECRET` 和数据库连接只在运行时注入实际值，修改这些配置不会触发应用重新编译
-
-构建需要支持 BuildKit 的 Docker / Docker Compose V2。更新 Dockerfile 后首次构建会重新准备依赖和缓存，后续页面修改才会受益；Next.js 仍会执行生产构建、类型检查和页面生成。
+在安装 Node.js 的服务器上直接运行 Next.js。先从 `.env.example` 创建 `.env.local`，设置随机 `AUTH_SECRET`，并将 `AUTH_URL` 和 `NEXT_PUBLIC_APP_URL` 改为实际访问地址。
 
 ```bash
-# 显示每个构建步骤，便于确认缓存命中和耗时
-docker compose --progress=plain build app
-
-# 使用已构建的镜像启动服务
-docker compose up -d --no-build
+npm ci
+npm run db:generate
+# 全新 SQLite 数据库：应用初始化迁移
+touch dev.db
+npx prisma migrate deploy
+npm run build
+npm run start
 ```
 
-缓存保存在当前 Docker builder 中，换机器或清理 builder 缓存后需要重新建立。日常更新请保留构建缓存，避免使用 `--no-cache` 或执行 `docker builder prune`。字体资源和许可位于 `public/fonts`，更新字体时需同步更新 `src/app/fonts.css` 中的引用。
+默认数据库文件为项目根目录的 `dev.db`。首次初始化前需要创建空文件，`touch` 不会清空已有文件。该文件需要持久保存，并在升级前备份。已有 SQLite 数据库继续使用下文的升级步骤及 `npm run db:push`；新的初始化迁移用于全新数据库。
+
+字体资源及许可随项目保存在 `public/fonts/`，构建无需下载 Google 字体。
 
 ---
 
 ## 🗄 数据库 / Database
 
-### 开发环境 / Development
+### SQLite
 
 使用 **SQLite**（零配置，开箱即用）  
 Using **SQLite** (zero-config, works out of the box)
 
 ```
 DATABASE_URL="file:./dev.db"
-```
-
-### 生产环境 / Production (Docker)
-
-使用 **PostgreSQL 17**  
-Using **PostgreSQL 17**
-
-```
-DATABASE_URL="postgresql://starkids:starkids@db:5432/starkids"
 ```
 
 ### 核心数据模型 / Core Data Models
@@ -317,13 +278,9 @@ DATABASE_URL="postgresql://starkids:starkids@db:5432/starkids"
 
 账号使用 **用户名 + 密码**，注册和家长添加小朋友均不需要邮箱或邮件服务。用户名支持中文、字母、数字、下划线、短横线和点，长度为 2–64 个字符；首尾空格会移除，英文字母统一为小写。用户名在整个系统内唯一，昵称可重复。密码至少 6 位。
 
-从旧版升级时，Docker 启动会自动应用数据库迁移：原邮箱 `@` 前的名称会转换为用户名，例如 `Dad@example.com` 转为 `dad`。如果该名称重名、不符合规则或以 `legacy_` 开头，会转换为 `legacy_用户ID`。用户 ID、原密码、家庭、任务和积分均保留。家长可以在“家庭成员”页面查看各成员的登录用户名。需要核对迁移后的账号时可执行：
-
-```bash
-docker compose exec db psql -U starkids -d starkids -c 'SELECT username, name FROM users ORDER BY "createdAt";'
-```
-
 本地 SQLite 已有旧账号时，先运行下面的迁移命令，再运行 `npm run db:push`。新安装直接运行 `npm run db:push`。
+
+迁移会将原邮箱 `@` 前的名称转换为用户名；重名、不符合规则或以 `legacy_` 开头的名称会转换为 `legacy_用户ID`。用户 ID、原密码、家庭、任务和积分均保留。家长可以在“家庭成员”页面查看登录用户名。
 
 ```bash
 npm run db:migrate-usernames:sqlite
