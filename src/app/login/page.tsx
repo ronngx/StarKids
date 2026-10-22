@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { credentialsSchema } from "@/lib/credentials"
-import { signIn, getSession } from "next-auth/react"
+import { signIn } from "next-auth/react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -43,14 +43,10 @@ export default function LoginPage() {
         return
       }
 
-      const session = await getSession()
-      const role = session?.user?.role
-      if (role === "PARENT" || role === "ADMIN") {
-        router.push("/admin")
-      } else {
-        router.push("/kids")
-      }
-      router.refresh()
+      // Let the server resolve the destination from the newly-created session.
+      // Reading the session here introduces a race with the session cookie being
+      // persisted, which can make the first login appear to do nothing.
+      router.replace("/dashboard")
     } catch {
       setError("网络错误，请稍后再试")
       setIsLoading(false)
