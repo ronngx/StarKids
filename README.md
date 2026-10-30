@@ -85,6 +85,7 @@
 ### 🔔 通知系统 / Notifications
 - **实时通知**：任务审批、奖励兑换状态变更通知
 - **已读管理**：支持标记已读
+- **Server酱³ 推送**：家庭共用一个 SendKey；小朋友完成普通或自动审核任务后推送给家长
 
 ---
 
@@ -187,7 +188,7 @@ npm install
 
 # 配置认证密钥及应用地址 / Configure auth secret and application URL
 cp .env.example .env.local
-# 编辑 .env.local，设置随机 AUTH_SECRET；可用 openssl rand -base64 32 生成
+# 局域网部署无需填写 AUTH_SECRET 或 PUSH_ENCRYPTION_KEY
 
 # 3. 生成 Prisma 客户端 / Generate Prisma client
 npm run db:generate
@@ -223,7 +224,7 @@ Open your browser at [http://localhost:3000](http://localhost:3000)
 
 ## 🚀 生产运行 / Production
 
-在安装 Node.js 的服务器上直接运行 Next.js。先从 `.env.example` 创建 `.env.local`，设置随机 `AUTH_SECRET`，并将 `AUTH_URL` 和 `NEXT_PUBLIC_APP_URL` 改为实际访问地址。
+在安装 Node.js 的服务器上直接运行 Next.js。先从 `.env.example` 创建 `.env.local`，将 `AUTH_URL` 和 `NEXT_PUBLIC_APP_URL` 改为实际访问地址。当前项目按局域网场景运行，`AUTH_SECRET` 和 `PUSH_ENCRYPTION_KEY` 不需要配置，应用会使用内置的稳定本地密钥。
 
 ```bash
 npm ci
@@ -234,6 +235,38 @@ npx prisma migrate deploy
 npm run build
 npm run start
 ```
+
+也可以使用项目内的部署脚本。它会检查生产环境变量、备份 SQLite 数据库、安装依赖、生成 Prisma Client、应用迁移并构建。直接执行时会自动检查用户级 `starkids.service`：如果其工作目录属于当前项目，则在构建成功后重启该服务；未检测到时以前台方式启动 Next.js。前台启动模式会在安装依赖和构建之前检查端口，端口已占用时直接提示并退出。使用 `--no-start` 时会在构建后退出，适合由 PM2 或容器编排器启动应用。
+
+```bash
+# 直接部署：自动识别并重启当前项目的 starkids.service
+./scripts/deploy-production.sh
+# 或使用 npm 入口（行为相同）
+npm run deploy:production
+
+# 已由用户级 systemd starkids.service 管理：部署后重启现有服务
+npm run deploy:production -- --restart-service starkids.service
+
+# 在其他端口部署并以前台方式启动
+npm run deploy:production -- --port 3001
+
+# 只部署，不启动进程
+npm run deploy:production -- --no-start
+
+# 使用指定环境文件和备份目录
+bash scripts/deploy-production.sh --env /etc/starkids/.env.local --backup-dir /var/backups/starkids
+```
+
+`--restart-service` 使用 `systemctl --user restart`，仅接受工作目录与当前项目一致的用户服务。服务的监听端口和运行环境由该 systemd 单元配置；此参数不能与 `--no-start` 或 `--port` 同时使用。系统级服务请使用 `--no-start` 完成部署后通过对应的进程管理器重启。
+
+如果构建已经完成，仅启动时遇到 `EADDRINUSE: address already in use :::3000`，说明已有进程监听 3000。对于上述用户级 systemd 服务，可直接重启并查看状态，无需再次构建：
+
+```bash
+systemctl --user restart starkids.service
+systemctl --user status starkids.service --no-pager
+```
+
+生产环境的 `.env.local` 需要设置 `AUTH_URL`、`NEXT_PUBLIC_APP_URL` 和 `DATABASE_URL`。局域网部署不需要设置 `AUTH_SECRET` 或 `PUSH_ENCRYPTION_KEY`；应用会使用内置的稳定本地密钥，分别用于 Auth.js 会话和家庭 Server酱³ SendKey 的加密。
 
 默认数据库文件为项目根目录的 `dev.db`。首次初始化前需要创建空文件，`touch` 不会清空已有文件。该文件需要持久保存，并在升级前备份。已有 SQLite 数据库继续使用下文的升级步骤及 `npm run db:push`；新的初始化迁移用于全新数据库。
 
@@ -268,6 +301,8 @@ DATABASE_URL="file:./dev.db"
 | `Achievement` | 成就定义 / Achievement definition |
 | `MemberAchievement` | 成员成就解锁 / Member achievement unlock |
 | `Notification` | 通知 / Notification |
+| `FamilyPushSetting` | 家庭级 Server酱³ 配置 / Family Server酱³ setting |
+| `PushDelivery` | 外部推送发送记录 / Push delivery record |
 | `PointConfig` | 积分配置 / Points configuration |
 
 ---
@@ -309,6 +344,9 @@ npm run db:migrate-usernames:sqlite -- /path/to/dev.db
 | `GET` | `/api/family/members` | 获取家庭成员 / Get family members |
 | `PATCH` | `/api/family/members` | 家长修改同一家庭成员的昵称、用户名及可选新密码（FormData：`memberId`、`nickname`、`username`、`password`） |
 | `POST` | `/api/family/add-kid` | 添加小朋友 / Add kid |
+| `GET` | `/api/family/push` | 获取家庭 Server酱³ 配置状态 / Get family push status |
+| `POST` | `/api/family/push` | 保存配置或发送测试消息 / Save setting or send test message |
+| `DELETE` | `/api/family/push` | 禁用家庭 Server酱³ 推送 / Disable family push |
 | `GET` | `/api/notifications` | 获取通知 / Get notifications |
 
 ### 儿童端 / Kids
@@ -328,9 +366,11 @@ npm run db:migrate-usernames:sqlite -- /path/to/dev.db
 | 变量 Variable | 说明 Description | 默认值 Default |
 |--------------|------------------|----------------|
 | `DATABASE_URL` | 数据库连接 / Database URL | `file:./dev.db` |
-| `AUTH_SECRET` | 认证密钥 / Auth secret | (必填 Required) |
+| `AUTH_SECRET` | 已取消；Auth.js 使用内置本地密钥 / Removed; Auth.js uses the built-in LAN key | 内置本地密钥 |
 | `AUTH_URL` | 认证 URL / Auth URL | `http://localhost:3000` |
 | `NEXT_PUBLIC_APP_URL` | 应用 URL / App URL | `http://localhost:3000` |
+| `PUSH_ENCRYPTION_KEY` | 已取消；家庭 SendKey 使用内置本地密钥加密 | 不需要 |
+| `PUSH_REQUEST_TIMEOUT_MS` | Server酱³ 请求超时毫秒数 / Push request timeout | `5000` |
 
 ---
 

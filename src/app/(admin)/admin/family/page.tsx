@@ -32,6 +32,15 @@ type FamilyData = {
   members: FamilyMember[]
 }
 
+type FamilyPushData = {
+  configured: boolean
+  enabled: boolean
+  sendKey: string | null
+  lastTestAt: string | null
+  lastTestStatus: string | null
+  lastError: string | null
+}
+
 const addKidSchema = z.object({
   nickname: z.string().min(2, "昵称至少2个字符"),
   username: usernameSchema,
@@ -116,6 +125,11 @@ export default function AdminFamilyPage() {
   const [addingKid, setAddingKid] = useState(false)
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
   const [savingMember, setSavingMember] = useState(false)
+  const [pushData, setPushData] = useState<FamilyPushData | null>(null)
+  const [pushSendKey, setPushSendKey] = useState("")
+  const [pushEnabled, setPushEnabled] = useState(true)
+  const [savingPush, setSavingPush] = useState(false)
+  const [testingPush, setTestingPush] = useState(false)
 
   const {
     register,
@@ -141,9 +155,26 @@ export default function AdminFamilyPage() {
     }
   }, [])
 
+  const fetchPushData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/family/push")
+      if (res.ok) {
+        const next = await res.json() as FamilyPushData
+        setPushData(next)
+        setPushEnabled(next.enabled)
+      }
+    } catch {
+      // Keep the page usable when the optional push settings request fails.
+    }
+  }, [])
+
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  useEffect(() => {
+    fetchPushData()
+  }, [fetchPushData])
 
   async function copyInviteCode() {
     if (!data?.inviteCode) return
@@ -211,6 +242,70 @@ export default function AdminFamilyPage() {
       toast("网络错误，请稍后重试", "error")
     } finally {
       setSavingMember(false)
+    }
+  }
+
+  async function savePushSetting() {
+    setSavingPush(true)
+    try {
+      const res = await fetch("/api/family/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sendKey: pushSendKey.trim() || undefined,
+          enabled: pushEnabled,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        toast(json.error || "保存推送设置失败", "error")
+        return
+      }
+      setPushData(json)
+      setPushSendKey("")
+      toast("Server酱³ 推送设置已保存", "success")
+    } catch {
+      toast("网络错误，请稍后重试", "error")
+    } finally {
+      setSavingPush(false)
+    }
+  }
+
+  async function testPushSetting() {
+    setTestingPush(true)
+    try {
+      const res = await fetch("/api/family/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ test: true }),
+      })
+      const json = await res.json()
+      if (json.setting) setPushData(json.setting)
+      if (json.success) toast(json.message || "测试消息已发送", "success")
+      else toast(json.message || json.error || "测试消息发送失败", "error")
+    } catch {
+      toast("网络错误，请稍后重试", "error")
+    } finally {
+      setTestingPush(false)
+    }
+  }
+
+  async function disablePushSetting() {
+    setSavingPush(true)
+    try {
+      const res = await fetch("/api/family/push", { method: "DELETE" })
+      const json = await res.json()
+      if (!res.ok) {
+        toast(json.error || "禁用推送失败", "error")
+        return
+      }
+      setPushData(json)
+      setPushEnabled(false)
+      toast("Server酱³ 推送已禁用", "success")
+    } catch {
+      toast("网络错误，请稍后重试", "error")
+    } finally {
+      setSavingPush(false)
     }
   }
 
@@ -403,6 +498,81 @@ export default function AdminFamilyPage() {
           {copied ? "✅ 已复制" : "📋 复制"}
         </button>
       </div>
+
+      <section className="bg-white rounded-xl shadow-card p-5 space-y-4">
+        <div>
+          <h2 className="font-semibold text-warm-700">📲 家长手机推送</h2>
+          <p className="text-xs text-warm-400 mt-1">
+            全家共用一个 Server酱³ SendKey。小朋友完成普通任务或自动审核任务后，都会推送给这个 SendKey 对应的设备。
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-warm-50 px-4 py-3 text-xs text-warm-500 space-y-1">
+          <p>请先在 <a href="https://sc3.ft07.com/sendkey" target="_blank" rel="noreferrer" className="text-admin-primary underline">Server酱³ SendKey 页面</a> 获取 SendKey，并在手机端完成接收配置。</p>
+          <p>SendKey 只在服务端加密保存，页面不会显示完整内容。</p>
+          {pushData?.sendKey && <p>当前配置：<span className="font-mono text-warm-600">{pushData.sendKey}</span></p>}
+        </div>
+
+        <div className="space-y-3">
+          <label htmlFor="serverchan-send-key" className="block text-sm font-medium text-warm-600">
+            {pushData?.configured ? "更新 SendKey（留空保留当前配置）" : "Server酱³ SendKey"}
+          </label>
+          <input
+            id="serverchan-send-key"
+            type="password"
+            value={pushSendKey}
+            onChange={(event) => setPushSendKey(event.target.value)}
+            placeholder={pushData?.configured ? "留空保留当前 SendKey" : "sctp..."}
+            autoComplete="new-password"
+            spellCheck={false}
+            className="w-full h-11 px-3 rounded-xl border border-warm-200 bg-warm-50 text-warm-700 text-sm focus:border-admin-primary focus:outline-none"
+          />
+          <label className="flex items-center gap-3 text-sm text-warm-600">
+            <input
+              type="checkbox"
+              checked={pushEnabled}
+              onChange={(event) => setPushEnabled(event.target.checked)}
+              className="h-4 w-4 accent-admin-primary"
+            />
+            完成任务后启用 Server酱³ 推送
+          </label>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={savePushSetting}
+            disabled={savingPush || testingPush}
+            className="h-10 px-4 rounded-xl bg-admin-primary text-white text-sm font-semibold hover:brightness-110 disabled:opacity-50"
+          >
+            {savingPush ? "保存中..." : "保存设置"}
+          </button>
+          <button
+            type="button"
+            onClick={testPushSetting}
+            disabled={!pushData?.configured || savingPush || testingPush}
+            className="h-10 px-4 rounded-xl border border-warm-200 text-warm-600 text-sm font-semibold hover:bg-warm-50 disabled:opacity-50"
+          >
+            {testingPush ? "发送中..." : "发送测试消息"}
+          </button>
+          {pushData?.configured && pushData.enabled && (
+            <button
+              type="button"
+              onClick={disablePushSetting}
+              disabled={savingPush || testingPush}
+              className="h-10 px-4 rounded-xl border border-candy-red/30 text-candy-red text-sm font-semibold hover:bg-candy-red/5 disabled:opacity-50"
+            >
+              禁用推送
+            </button>
+          )}
+        </div>
+
+        {pushData?.lastTestAt && (
+          <p className={cn("text-xs", pushData.lastTestStatus === "SENT" ? "text-candy-green" : "text-candy-red")}>
+            最近测试：{pushData.lastTestStatus === "SENT" ? "发送成功" : `发送失败${pushData.lastError ? `：${pushData.lastError}` : ""}`} · {new Date(pushData.lastTestAt).toLocaleString("zh-CN")}
+          </p>
+        )}
+      </section>
 
       {parents.length > 0 && (
         <div>

@@ -3,8 +3,10 @@ import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/db"
 import { credentialsSchema } from "@/lib/credentials"
+import { getAppSecret } from "@/lib/config"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: getAppSecret(),
   session: { strategy: "jwt" },
   providers: [
     Credentials({

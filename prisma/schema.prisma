@@ -178,6 +178,19 @@ enum NotificationPriority {
   HIGH
 }
 
+// ── 外部推送渠道 ──
+enum PushProvider {
+  SERVERCHAN3
+}
+
+// ── 外部推送发送状态 ──
+enum PushDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 // ── 成就分类 ──
 enum AchievementCategory {
   LABOR                // 劳动
@@ -263,6 +276,8 @@ model Family {
   themes      ThemeSkin[]
   pointConfigs PointConfig[]
   petOutfits  PetOutfit[]
+  pushSetting  FamilyPushSetting?
+  pushDeliveries PushDelivery[]
 
   @@map("families")
 }
@@ -413,6 +428,7 @@ model TaskCompletion {
 
   // 证明 (可选 - 家长上传照片等)
   proofImages String  @default("[]")          // JSON array of image URLs
+  pushDeliveries PushDelivery[]
 
   createdAt   DateTime @default(now())
 
@@ -711,6 +727,49 @@ model Notification {
   @@index([memberId, isRead])
   @@index([createdAt])
   @@map("notifications")
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  📲 家庭级外部推送配置
+// ──────────────────────────────────────────────────────────────────────────────
+model FamilyPushSetting {
+  id                String       @id @default(uuid())
+  familyId          String       @unique
+  family            Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  provider          PushProvider  @default(SERVERCHAN3)
+  sendKeyCiphertext String
+  enabled           Boolean      @default(true)
+  lastTestAt        DateTime?
+  lastTestStatus    String?
+  lastError         String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@map("family_push_settings")
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  📲 外部推送发送记录
+// ──────────────────────────────────────────────────────────────────────────────
+model PushDelivery {
+  id              String              @id @default(uuid())
+  completionId    String
+  completion      TaskCompletion      @relation(fields: [completionId], references: [id], onDelete: Cascade)
+  familyId        String
+  family          Family              @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  provider        PushProvider
+  status          PushDeliveryStatus  @default(PENDING)
+  attemptCount    Int                 @default(0)
+  responseCode    Int?
+  responseMessage String?
+  errorMessage    String?
+  sentAt          DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([completionId, provider])
+  @@index([familyId, status, createdAt])
+  @@map("push_deliveries")
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

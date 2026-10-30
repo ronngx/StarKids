@@ -8,6 +8,7 @@ import path from "node:path"
 import { build } from "esbuild"
 import { PrismaClient } from "@prisma/client"
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3"
+import { encryptServerChanSendKey } from "../src/lib/push/serverchan3"
 
 const root = path.resolve(__dirname, "..")
 const require = createRequire(path.join(root, "package.json"))
@@ -135,9 +136,36 @@ test("自动审核任务撤回实际积分及本次成就，反复勾选不累�
     assert.equal(current.pointsEarned, 15)
     assert.equal(await balance(), 115)
     assert.equal(await db.achievementGrant.count(), 1)
+    assert.equal(await db.notification.count(), 1)
+    assert.equal(await db.pushDelivery.count(), 1)
+    assert.equal((await db.pushDelivery.findFirstOrThrow()).status, "SKIPPED")
     await actions.cancelTaskCompletion(current.id)
     assert.equal(await balance(), 100)
     assert.equal(await db.achievementGrant.count(), 0)
+  }
+})
+
+test("配置家庭 SendKey 后，完成任务会发送一次 Server酱³ 推送", async () => {
+  await db.familyPushSetting.create({
+    data: {
+      familyId: "family",
+      sendKeyCiphertext: encryptServerChanSendKey("sctp12345t-test-secret"),
+    },
+  })
+  const originalFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async () => {
+    calls++
+    return new Response(JSON.stringify({ code: 0, message: "发送成功" }), { status: 200 })
+  }
+  try {
+    await actions.completeTask(taskId)
+    assert.equal(calls, 1)
+    assert.equal((await db.pushDelivery.findFirstOrThrow()).status, "SENT")
+    await assert.rejects(actions.completeTask(taskId), /今天已经提交过/)
+    assert.equal(calls, 1)
+  } finally {
+    globalThis.fetch = originalFetch
   }
 })
 

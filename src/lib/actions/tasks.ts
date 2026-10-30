@@ -7,6 +7,7 @@ import { calculatePoints } from "@/lib/points-engine"
 import { checkAchievements } from "@/lib/achievement-engine"
 import { formatPoints, normalizePoints, parsePoints } from "@/lib/points"
 import { createNotification } from "./notifications"
+import { sendFamilyTaskCompletionPush } from "@/lib/push/family"
 import type { TaskCategory, TaskType, TaskFrequency, TaskDifficulty, TaskStatus } from "@prisma/client"
 
 // ═══════════════════════════════════════════════════════════════
@@ -154,6 +155,7 @@ export async function completeTask(taskId: string) {
     where: { userId: session.user.id },
   })
   if (!member) throw new Error("你还未加入家庭")
+  if (member.role !== "KID") throw new Error("只有小朋友可以完成任务")
 
   const task = await prisma.task.findUnique({
     where: { id: taskId },
@@ -211,24 +213,33 @@ export async function completeTask(taskId: string) {
   })
 
   try {
-    if (!task.autoApprove) {
-      const parents = await prisma.familyMember.findMany({
-        where: { familyId: member.familyId, role: "PARENT" },
-        select: { userId: true },
-      })
-      for (const p of parents) {
-        await createNotification({
-          userId: p.userId,
-          memberId: member.id,
-          type: "TASK_COMPLETED",
-          priority: "NORMAL",
-          title: `${member.nickname} 完成了任务`,
-          content: `"${task.name}" +${formatPoints(totalPoints)}⭐，等待你的审核`,
-          link: "/admin/tasks",
-          data: { completionId: completion.id, taskId, memberId: member.id },
-        })
-      }
-    }
+    const parents = await prisma.familyMember.findMany({
+      where: { familyId: member.familyId, role: "PARENT" },
+      select: { userId: true },
+    })
+    const statusText = task.autoApprove ? "已自动通过" : "等待你的审核"
+    const title = `${member.nickname || "小朋友"} 完成了任务`
+    const content = `"${task.name}" +${formatPoints(totalPoints)}⭐，${statusText}`
+    await Promise.allSettled(parents.map((parent) => createNotification({
+      userId: parent.userId,
+      memberId: member.id,
+      type: "TASK_COMPLETED",
+      priority: "NORMAL",
+      title,
+      content,
+      link: "/admin/tasks",
+      data: { completionId: completion.id, taskId, memberId: member.id },
+    })))
+
+    await sendFamilyTaskCompletionPush({
+      familyId: member.familyId,
+      completionId: completion.id,
+      kidNickname: member.nickname || "小朋友",
+      taskName: task.name,
+      points: totalPoints,
+      autoApproved: task.autoApprove,
+      completedAt: completion.createdAt,
+    })
   } catch (e) {
     console.error("Post-completion operations failed:", e)
   }
