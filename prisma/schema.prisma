@@ -276,7 +276,6 @@ model Family {
   themes      ThemeSkin[]
   pointConfigs PointConfig[]
   petOutfits  PetOutfit[]
-  pushSetting  FamilyPushSetting?
   pushDeliveries PushDelivery[]
 
   @@map("families")
@@ -317,6 +316,8 @@ model FamilyMember {
   themeSkins      ThemeSkin[]
   dailyStats      DailyStats[]
   weeklyStats     WeeklyStats[]
+  pushSetting     ParentPushSetting?
+  pushDeliveries  PushDelivery[]       @relation("PushRecipient")
 
   @@unique([familyId, userId])
   @@index([familyId])
@@ -730,12 +731,12 @@ model Notification {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-//  📲 家庭级外部推送配置
+//  📲 家长级外部推送配置
 // ──────────────────────────────────────────────────────────────────────────────
-model FamilyPushSetting {
+model ParentPushSetting {
   id                String       @id @default(uuid())
-  familyId          String       @unique
-  family            Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  parentMemberId    String       @unique
+  parentMember      FamilyMember @relation(fields: [parentMemberId], references: [id], onDelete: Cascade)
   provider          PushProvider  @default(SERVERCHAN3)
   sendKeyCiphertext String
   enabled           Boolean      @default(true)
@@ -745,7 +746,7 @@ model FamilyPushSetting {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  @@map("family_push_settings")
+  @@map("parent_push_settings")
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -757,6 +758,8 @@ model PushDelivery {
   completion      TaskCompletion      @relation(fields: [completionId], references: [id], onDelete: Cascade)
   familyId        String
   family          Family              @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  recipientMemberId String?
+  recipientMember   FamilyMember?     @relation("PushRecipient", fields: [recipientMemberId], references: [id], onDelete: SetNull)
   provider        PushProvider
   status          PushDeliveryStatus  @default(PENDING)
   attemptCount    Int                 @default(0)
@@ -767,7 +770,7 @@ model PushDelivery {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
-  @@unique([completionId, provider])
+  @@unique([completionId, provider, recipientMemberId])
   @@index([familyId, status, createdAt])
   @@map("push_deliveries")
 }

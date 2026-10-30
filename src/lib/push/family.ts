@@ -33,35 +33,41 @@ function appUrl(path: string) {
   return base ? `${base}${path}` : null
 }
 
-export async function sendFamilyTaskCompletionPush(params: {
-  familyId: string
+async function sendParentTaskCompletionPush(params: {
+  parent: {
+    id: string
+    pushSetting: {
+      enabled: boolean
+      sendKeyCiphertext: string
+    } | null
+  }
+  timezone: string
   completionId: string
+  familyId: string
   kidNickname: string
   taskName: string
   points: number
   autoApproved: boolean
   completedAt: Date
 }) {
-  const setting = await prisma.familyPushSetting.findUnique({
-    where: { familyId: params.familyId },
-    include: { family: { select: { timezone: true } } },
-  })
-
+  const setting = params.parent.pushSetting
   const delivery = await prisma.pushDelivery.upsert({
     where: {
-      completionId_provider: {
+      completionId_provider_recipientMemberId: {
         completionId: params.completionId,
         provider: "SERVERCHAN3",
+        recipientMemberId: params.parent.id,
       },
     },
     create: {
       completionId: params.completionId,
       familyId: params.familyId,
+      recipientMemberId: params.parent.id,
       provider: "SERVERCHAN3",
       status: setting?.enabled ? "PENDING" : "SKIPPED",
       responseMessage: !setting
-        ? "家庭未配置 Server酱³"
-        : setting.enabled ? undefined : "家庭未启用 Server酱³",
+        ? "家长未配置 Server酱³"
+        : setting.enabled ? undefined : "家长未启用 Server酱³",
     },
     update: {},
   })
@@ -72,7 +78,7 @@ export async function sendFamilyTaskCompletionPush(params: {
     if (delivery.status !== "SKIPPED") {
       return prisma.pushDelivery.update({
         where: { id: delivery.id },
-        data: { status: "SKIPPED", responseMessage: "家庭未启用 Server酱³" },
+        data: { status: "SKIPPED", responseMessage: "家长未启用 Server酱³" },
       })
     }
     return delivery
@@ -85,7 +91,7 @@ export async function sendFamilyTaskCompletionPush(params: {
     `任务：${params.taskName}`,
     `积分：+${formatPoints(params.points)}⭐`,
     `状态：${state}`,
-    `时间：${formatCompletedAt(params.completedAt, setting.family.timezone)}`,
+    `时间：${formatCompletedAt(params.completedAt, params.timezone)}`,
   ]
   const link = appUrl("/admin/tasks")
   if (link) lines.push(`\n[打开 StarKids](${link})`)
@@ -119,4 +125,36 @@ export async function sendFamilyTaskCompletionPush(params: {
       sentAt: result.ok ? new Date() : null,
     },
   })
+}
+
+export async function sendFamilyTaskCompletionPush(params: {
+  familyId: string
+  completionId: string
+  kidNickname: string
+  taskName: string
+  points: number
+  autoApproved: boolean
+  completedAt: Date
+}) {
+  const family = await prisma.family.findUnique({
+    where: { id: params.familyId },
+    select: { timezone: true },
+  })
+  if (!family) return []
+
+  const parents = await prisma.familyMember.findMany({
+    where: { familyId: params.familyId, role: "PARENT" },
+    select: {
+      id: true,
+      pushSetting: {
+        select: { enabled: true, sendKeyCiphertext: true },
+      },
+    },
+  })
+
+  return Promise.all(parents.map((parent) => sendParentTaskCompletionPush({
+    parent,
+    timezone: family.timezone,
+    ...params,
+  })))
 }

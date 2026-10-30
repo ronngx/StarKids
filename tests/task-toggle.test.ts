@@ -145,25 +145,38 @@ test("自动审核任务撤回实际积分及本次成就，反复勾选不累�
   }
 })
 
-test("配置家庭 SendKey 后，完成任务会发送一次 Server酱³ 推送", async () => {
-  await db.familyPushSetting.create({
+test("每位家长的 SendKey 都会独立收到一次任务推送", async () => {
+  await db.parentPushSetting.create({
     data: {
-      familyId: "family",
+      parentMemberId: "parent-member",
       sendKeyCiphertext: encryptServerChanSendKey("sctp12345t-test-secret"),
     },
   })
+  await db.user.create({ data: { id: "parent2", username: "parent2", role: "PARENT" } })
+  await db.familyMember.create({ data: { id: "parent2-member", familyId: "family", userId: "parent2", role: "PARENT" } })
+  await db.parentPushSetting.create({
+    data: {
+      parentMemberId: "parent2-member",
+      sendKeyCiphertext: encryptServerChanSendKey("sctp67890t-other-secret"),
+    },
+  })
   const originalFetch = globalThis.fetch
-  let calls = 0
-  globalThis.fetch = async () => {
-    calls++
+  const requestUrls: string[] = []
+  globalThis.fetch = async (input) => {
+    requestUrls.push(String(input))
     return new Response(JSON.stringify({ code: 0, message: "发送成功" }), { status: 200 })
   }
   try {
     await actions.completeTask(taskId)
-    assert.equal(calls, 1)
-    assert.equal((await db.pushDelivery.findFirstOrThrow()).status, "SENT")
+    assert.equal(requestUrls.length, 2)
+    assert.deepEqual(requestUrls.sort(), [
+      "https://12345.push.ft07.com/send/sctp12345t-test-secret.send",
+      "https://67890.push.ft07.com/send/sctp67890t-other-secret.send",
+    ])
+    assert.equal(await db.pushDelivery.count(), 2)
+    assert.equal(await db.pushDelivery.count({ where: { status: "SENT" } }), 2)
     await assert.rejects(actions.completeTask(taskId), /今天已经提交过/)
-    assert.equal(calls, 1)
+    assert.equal(requestUrls.length, 2)
   } finally {
     globalThis.fetch = originalFetch
   }

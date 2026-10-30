@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server"
 import {
-  disableFamilyPush,
-  getFamilyPushSetting,
-  saveFamilyPushSetting,
-  testFamilyPush,
+  disableParentPush,
+  getParentPushSetting,
+  saveParentPushSetting,
+  testParentPush,
 } from "@/lib/actions/push"
 
 export async function GET() {
   try {
-    return NextResponse.json(await getFamilyPushSetting())
+    return NextResponse.json(await getParentPushSetting())
   } catch (error) {
     const message = error instanceof Error ? error.message : "无法读取推送设置"
     return NextResponse.json({ error: message }, { status: message === "请先登录" ? 401 : 403 })
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     }
 
     if (body.test === true) {
-      return NextResponse.json(await testFamilyPush())
+      return NextResponse.json(await testParentPush())
     }
 
     if (body.sendKey !== undefined && typeof body.sendKey !== "string") {
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "推送开关格式无效" }, { status: 400 })
     }
 
-    return NextResponse.json(await saveFamilyPushSetting({
+    return NextResponse.json(await saveParentPushSetting({
       sendKey: body.sendKey as string | undefined,
       enabled: body.enabled as boolean | undefined,
     }))
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
 export async function DELETE() {
   try {
-    return NextResponse.json(await disableFamilyPush())
+    return NextResponse.json(await disableParentPush())
   } catch (error) {
     const message = error instanceof Error ? error.message : "禁用推送失败"
     return NextResponse.json({ error: message }, { status: message === "请先登录" ? 401 : 403 })

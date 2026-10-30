@@ -503,19 +503,19 @@ export default function AdminFamilyPage() {
         <div>
           <h2 className="font-semibold text-warm-700">📲 家长手机推送</h2>
           <p className="text-xs text-warm-400 mt-1">
-            全家共用一个 Server酱³ SendKey。小朋友完成普通任务或自动审核任务后，都会推送给这个 SendKey 对应的设备。
+            每位家长独立配置自己的 Server酱³ SendKey。小朋友完成普通任务或自动审核任务后，会分别推送到已启用的家长设备。
           </p>
         </div>
 
         <div className="rounded-xl bg-warm-50 px-4 py-3 text-xs text-warm-500 space-y-1">
           <p>请先在 <a href="https://sc3.ft07.com/sendkey" target="_blank" rel="noreferrer" className="text-admin-primary underline">Server酱³ SendKey 页面</a> 获取 SendKey，并在手机端完成接收配置。</p>
-          <p>SendKey 只在服务端加密保存，页面不会显示完整内容。</p>
+          <p>当前登录家长的 SendKey 只在服务端加密保存，页面不会显示完整内容。</p>
           {pushData?.sendKey && <p>当前配置：<span className="font-mono text-warm-600">{pushData.sendKey}</span></p>}
         </div>
 
         <div className="space-y-3">
           <label htmlFor="serverchan-send-key" className="block text-sm font-medium text-warm-600">
-            {pushData?.configured ? "更新 SendKey（留空保留当前配置）" : "Server酱³ SendKey"}
+            {pushData?.configured ? "更新我的 SendKey（留空保留当前配置）" : "我的 Server酱³ SendKey"}
           </label>
           <input
             id="serverchan-send-key"

@@ -85,7 +85,7 @@
 ### 🔔 通知系统 / Notifications
 - **实时通知**：任务审批、奖励兑换状态变更通知
 - **已读管理**：支持标记已读
-- **Server酱³ 推送**：家庭共用一个 SendKey；小朋友完成普通或自动审核任务后推送给家长
+- **Server酱³ 推送**：每位家长独立配置一个 SendKey；小朋友完成普通或自动审核任务后分别推送给已启用的家长
 
 ---
 
@@ -266,7 +266,7 @@ systemctl --user restart starkids.service
 systemctl --user status starkids.service --no-pager
 ```
 
-生产环境的 `.env.local` 需要设置 `AUTH_URL`、`NEXT_PUBLIC_APP_URL` 和 `DATABASE_URL`。局域网部署不需要设置 `AUTH_SECRET` 或 `PUSH_ENCRYPTION_KEY`；应用会使用内置的稳定本地密钥，分别用于 Auth.js 会话和家庭 Server酱³ SendKey 的加密。
+生产环境的 `.env.local` 需要设置 `AUTH_URL`、`NEXT_PUBLIC_APP_URL` 和 `DATABASE_URL`。局域网部署不需要设置 `AUTH_SECRET` 或 `PUSH_ENCRYPTION_KEY`；应用会使用内置的稳定本地密钥，分别用于 Auth.js 会话和每位家长 Server酱³ SendKey 的加密。
 
 默认数据库文件为项目根目录的 `dev.db`。首次初始化前需要创建空文件，`touch` 不会清空已有文件。该文件需要持久保存，并在升级前备份。已有 SQLite 数据库继续使用下文的升级步骤及 `npm run db:push`；新的初始化迁移用于全新数据库。
 
@@ -301,7 +301,7 @@ DATABASE_URL="file:./dev.db"
 | `Achievement` | 成就定义 / Achievement definition |
 | `MemberAchievement` | 成员成就解锁 / Member achievement unlock |
 | `Notification` | 通知 / Notification |
-| `FamilyPushSetting` | 家庭级 Server酱³ 配置 / Family Server酱³ setting |
+| `ParentPushSetting` | 家长级 Server酱³ 配置 / Parent Server酱³ setting |
 | `PushDelivery` | 外部推送发送记录 / Push delivery record |
 | `PointConfig` | 积分配置 / Points configuration |
 
@@ -344,9 +344,9 @@ npm run db:migrate-usernames:sqlite -- /path/to/dev.db
 | `GET` | `/api/family/members` | 获取家庭成员 / Get family members |
 | `PATCH` | `/api/family/members` | 家长修改同一家庭成员的昵称、用户名及可选新密码（FormData：`memberId`、`nickname`、`username`、`password`） |
 | `POST` | `/api/family/add-kid` | 添加小朋友 / Add kid |
-| `GET` | `/api/family/push` | 获取家庭 Server酱³ 配置状态 / Get family push status |
-| `POST` | `/api/family/push` | 保存配置或发送测试消息 / Save setting or send test message |
-| `DELETE` | `/api/family/push` | 禁用家庭 Server酱³ 推送 / Disable family push |
+| `GET` | `/api/family/push` | 获取当前家长的 Server酱³ 配置状态 / Get current parent's push status |
+| `POST` | `/api/family/push` | 保存当前家长配置或发送测试消息 / Save current parent's setting or send test message |
+| `DELETE` | `/api/family/push` | 禁用当前家长的 Server酱³ 推送 / Disable current parent's push |
 | `GET` | `/api/notifications` | 获取通知 / Get notifications |
 
 ### 儿童端 / Kids
@@ -369,7 +369,7 @@ npm run db:migrate-usernames:sqlite -- /path/to/dev.db
 | `AUTH_SECRET` | 已取消；Auth.js 使用内置本地密钥 / Removed; Auth.js uses the built-in LAN key | 内置本地密钥 |
 | `AUTH_URL` | 认证 URL / Auth URL | `http://localhost:3000` |
 | `NEXT_PUBLIC_APP_URL` | 应用 URL / App URL | `http://localhost:3000` |
-| `PUSH_ENCRYPTION_KEY` | 已取消；家庭 SendKey 使用内置本地密钥加密 | 不需要 |
+| `PUSH_ENCRYPTION_KEY` | 已取消；每位家长 SendKey 使用内置本地密钥加密 | 不需要 |
 | `PUSH_REQUEST_TIMEOUT_MS` | Server酱³ 请求超时毫秒数 / Push request timeout | `5000` |
 
 ---

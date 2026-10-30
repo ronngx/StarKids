@@ -22,8 +22,8 @@ async function currentParentMember() {
   return member
 }
 
-async function publicState(familyId: string) {
-  const setting = await prisma.familyPushSetting.findUnique({ where: { familyId } })
+async function publicState(parentMemberId: string) {
+  const setting = await prisma.parentPushSetting.findUnique({ where: { parentMemberId } })
   if (!setting) {
     return {
       configured: false,
@@ -52,14 +52,14 @@ async function publicState(familyId: string) {
   }
 }
 
-export async function getFamilyPushSetting() {
+export async function getParentPushSetting() {
   const member = await currentParentMember()
-  return publicState(member.familyId)
+  return publicState(member.id)
 }
 
-export async function saveFamilyPushSetting(input: { sendKey?: string; enabled?: boolean }) {
+export async function saveParentPushSetting(input: { sendKey?: string; enabled?: boolean }) {
   const member = await currentParentMember()
-  const existing = await prisma.familyPushSetting.findUnique({ where: { familyId: member.familyId } })
+  const existing = await prisma.parentPushSetting.findUnique({ where: { parentMemberId: member.id } })
   const sendKey = input.sendKey?.trim()
 
   let encrypted = existing?.sendKeyCiphertext
@@ -69,10 +69,10 @@ export async function saveFamilyPushSetting(input: { sendKey?: string; enabled?:
   }
   if (!encrypted) throw new Error("请输入 Server酱³ SendKey")
 
-  await prisma.familyPushSetting.upsert({
-    where: { familyId: member.familyId },
+  await prisma.parentPushSetting.upsert({
+    where: { parentMemberId: member.id },
     create: {
-      familyId: member.familyId,
+      parentMemberId: member.id,
       sendKeyCiphertext: encrypted,
       enabled: input.enabled ?? true,
       lastTestStatus: null,
@@ -85,24 +85,24 @@ export async function saveFamilyPushSetting(input: { sendKey?: string; enabled?:
     },
   })
 
-  return publicState(member.familyId)
+  return publicState(member.id)
 }
 
-export async function disableFamilyPush() {
+export async function disableParentPush() {
   const member = await currentParentMember()
-  const setting = await prisma.familyPushSetting.findUnique({ where: { familyId: member.familyId } })
+  const setting = await prisma.parentPushSetting.findUnique({ where: { parentMemberId: member.id } })
   if (setting) {
-    await prisma.familyPushSetting.update({
-      where: { familyId: member.familyId },
+    await prisma.parentPushSetting.update({
+      where: { parentMemberId: member.id },
       data: { enabled: false },
     })
   }
-  return publicState(member.familyId)
+  return publicState(member.id)
 }
 
-export async function testFamilyPush() {
+export async function testParentPush() {
   const member = await currentParentMember()
-  const setting = await prisma.familyPushSetting.findUnique({ where: { familyId: member.familyId } })
+  const setting = await prisma.parentPushSetting.findUnique({ where: { parentMemberId: member.id } })
   if (!setting) throw new Error("请先保存 Server酱³ SendKey")
 
   let result
@@ -112,7 +112,7 @@ export async function testFamilyPush() {
     result = await sendServerChan3({
       sendKey,
       title: "StarKids 推送测试",
-      desp: "Server酱³ 已成功连接到当前家庭。",
+      desp: "Server酱³ 已成功连接到当前家长账号。",
       short: "StarKids 推送测试",
       tags: "StarKids|测试",
     })
@@ -124,8 +124,8 @@ export async function testFamilyPush() {
     }
   }
 
-  await prisma.familyPushSetting.update({
-    where: { familyId: member.familyId },
+  await prisma.parentPushSetting.update({
+    where: { parentMemberId: member.id },
     data: {
       lastTestAt: new Date(),
       lastTestStatus: result.ok ? "SENT" : "FAILED",
@@ -136,6 +136,6 @@ export async function testFamilyPush() {
   return {
     success: result.ok,
     message: result.ok ? "测试消息已发送" : result.message,
-    setting: await publicState(member.familyId),
+    setting: await publicState(member.id),
   }
 }

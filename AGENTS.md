@@ -46,4 +46,4 @@ Pull Request 应说明用户可见的行为变化、数据库或配置变化和�
 
 ## 安全与配置提示
 
-不要提交 `.env.local`、SQLite 数据库、Server酱³ SendKey 或 `.next` 构建产物。Server酱³ SendKey 应通过家庭管理页面录入，并使用应用内置的局域网密钥保存。除非完善认证和密钥管理方案，否则请保持应用只在可信局域网内运行。
+不要提交 `.env.local`、SQLite 数据库、Server酱³ SendKey 或 `.next` 构建产物。每位家长的 Server酱³ SendKey 应通过家庭管理页面录入，并使用应用内置的局域网密钥保存。除非完善认证和密钥管理方案，否则请保持应用只在可信局域网内运行。
