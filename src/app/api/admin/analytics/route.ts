@@ -39,7 +39,7 @@ export async function GET() {
     // 全部完成记录（30天内，按天分组）
     prisma.taskCompletion.findMany({
       where: { member: { familyId }, date: { gte: thirtyDaysAgo }, status: "APPROVED" },
-      select: { date: true, pointsEarned: true, memberId: true, task: { select: { category: true } } },
+      select: { id: true, date: true, pointsEarned: true, memberId: true, task: { select: { name: true, category: true } } },
       orderBy: { date: "asc" },
     }),
 
@@ -171,6 +171,23 @@ export async function GET() {
     globalCategories[cat] = (globalCategories[cat] || 0) + 1
   }
 
+  // ── 积分明细（近30天已到账的任务积分）──
+  // 积分明细直接使用任务完成记录，确保即使历史 PointLog 未完整写入，
+  // 统计页面仍能展示实际到账的积分。
+  const memberNames = new Map(kidsMembers.map((member) => [member.id, member.nickname || "小朋友"]))
+  const pointDetails = allCompletions
+    .map((completion) => ({
+      id: completion.id,
+      date: completion.date.toISOString(),
+      memberId: completion.memberId,
+      memberName: memberNames.get(completion.memberId) || "小朋友",
+      taskName: completion.task?.name || "已完成任务",
+      category: completion.task?.category || "OTHER",
+      points: normalizePoints(completion.pointsEarned),
+      type: "TASK_COMPLETE" as const,
+    }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
   return NextResponse.json({
     overview: {
       totalTasksCompleted: totalCompleted30d,
@@ -182,6 +199,7 @@ export async function GET() {
     daily: Object.values(dailyStats),
     memberStats,
     pointsTrend,
+    pointDetails,
     categories: Object.entries(globalCategories).map(([name, value]) => ({ name, value })),
     pointConfig: pointConfig || null,
   })

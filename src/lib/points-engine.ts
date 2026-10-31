@@ -19,12 +19,13 @@ export async function calculatePoints(
   taskPoints: number,
   memberId: string,
   familyId: string,
+  now = new Date(),
 ): Promise<BonusResult> {
   taskPoints = normalizePoints(taskPoints)
   const breakdown: string[] = [`基础积分: +${formatPoints(taskPoints)}⭐`]
   let bonusPoints = 0
 
-  const [rules, member, config] = await Promise.all([
+  const [rules, member, config, family] = await Promise.all([
     prisma.pointRule.findMany({
       where: { familyId, isActive: true },
     }),
@@ -35,7 +36,22 @@ export async function calculatePoints(
     prisma.pointConfig.findFirst({
       where: { familyId },
     }),
+    prisma.family.findUnique({
+      where: { id: familyId },
+      select: { timezone: true },
+    }),
   ])
+
+  // Older families can have weekendDouble enabled without a corresponding
+  // PointRule row. The setting itself must still activate the bonus. When a
+  // rule exists, its multiplier remains authoritative and this fallback is
+  // skipped to avoid awarding the bonus twice.
+  const hasWeekendRule = rules.some((rule) => rule.ruleType === "WEEKEND_DOUBLE")
+  if (!hasWeekendRule && isWeekend(now, family?.timezone) && config?.weekendDouble) {
+    const bonus = taskPoints
+    bonusPoints = normalizePoints(bonusPoints + bonus)
+    breakdown.push(`周末双倍积分: +${formatPoints(bonus)}⭐`)
+  }
 
   for (const rule of rules) {
     const params = JSON.parse(rule.params) as PointRuleParams
@@ -52,7 +68,7 @@ export async function calculatePoints(
       }
 
       case "WEEKEND_DOUBLE": {
-        if (isWeekend() && config?.weekendDouble) {
+        if (isWeekend(now, family?.timezone) && config?.weekendDouble) {
           const bonus = normalizePoints(taskPoints * ((params.multiplier || 2) - 1))
           bonusPoints = normalizePoints(bonusPoints + bonus)
           breakdown.push(`${rule.name}: +${formatPoints(bonus)}⭐`)
@@ -145,9 +161,18 @@ async function getTodayPoints(memberId: string): Promise<number> {
   return normalizePoints(completions._sum.pointsEarned)
 }
 
-function isWeekend(): boolean {
-  const day = new Date().getDay()
-  return day === 0 || day === 6
+function isWeekend(date: Date, timezone?: string | null): boolean {
+  try {
+    const weekday = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone || "Asia/Shanghai",
+      weekday: "short",
+    }).format(date)
+    return weekday === "Sat" || weekday === "Sun"
+  } catch {
+    // An invalid legacy timezone should not disable the bonus entirely.
+    const day = date.getDay()
+    return day === 0 || day === 6
+  }
 }
 
 function isBirthday(birthday: Date | null): boolean {

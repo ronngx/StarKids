@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 const navItems = [
   { href: "/kids", label: "首页", icon: "🏠" },
   { href: "/kids/tasks", label: "任务", icon: "📋" },
+  { href: "/kids/points", label: "明细", icon: "🧾" },
   { href: "/kids/shop", label: "商城", icon: "🛒" },
   { href: "/kids/pet", label: "宠物", icon: "🐱" },
   { href: "/kids/achievements", label: "成就", icon: "🏆" },

@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "deploy-dev": "bash scripts/deploy-dev.sh",
+    "stop": "bash scripts/stop.sh",
+    "restart": "bash scripts/restart.sh",
     "build": "next build",
     "deploy:production": "bash scripts/deploy-production.sh",
     "start": "next start",

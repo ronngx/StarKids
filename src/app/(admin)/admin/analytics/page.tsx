@@ -38,6 +38,16 @@ type MemberStat = {
 }
 type PointTrend = { date: string; points: number }
 type CategoryData = { name: string; value: number }
+type PointDetail = {
+  id: string
+  date: string
+  memberId: string
+  memberName: string
+  taskName: string
+  category: string
+  points: number
+  type: "TASK_COMPLETE"
+}
 
 type AnalyticsData = {
   overview: { totalTasksCompleted: number; totalPointsEarned: number; approvalRate: number; pendingTasks: number; pendingRedemptions: number }
@@ -45,6 +55,7 @@ type AnalyticsData = {
   memberStats: MemberStat[]
   pointsTrend: PointTrend[]
   categories: CategoryData[]
+  pointDetails: PointDetail[]
 }
 
 export default function AdminAnalyticsPage() {
@@ -108,7 +119,7 @@ export default function AdminAnalyticsPage() {
     )
   }
 
-  const { overview, daily, memberStats, pointsTrend, categories } = data
+  const { overview, daily, memberStats, pointsTrend, categories, pointDetails } = data
 
   const categoryChartData = categories.map((c) => ({
     name: CATEGORY_CHART_CONFIG[c.name]?.label || c.name,
@@ -130,6 +141,10 @@ export default function AdminAnalyticsPage() {
   const filteredMembers = selectedMember === "ALL"
     ? memberStats
     : memberStats.filter((m) => m.memberId === selectedMember)
+
+  const filteredPointDetails = selectedMember === "ALL"
+    ? pointDetails
+    : pointDetails.filter((detail) => detail.memberId === selectedMember)
 
   return (
     <div className="space-y-6">
@@ -227,6 +242,53 @@ export default function AdminAnalyticsPage() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-card p-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div>
+            <h2 className="font-semibold text-warm-800">🧾 积分明细</h2>
+            <p className="text-xs text-warm-400 mt-1">近30天已到账的任务积分，共 {filteredPointDetails.length} 条</p>
+          </div>
+          <span className="text-sm font-semibold text-brand-500">
+            +{formatPoints(filteredPointDetails.reduce((sum, detail) => sum + detail.points, 0))}⭐
+          </span>
+        </div>
+        {filteredPointDetails.length === 0 ? (
+          <p className="text-sm text-warm-400 text-center py-8">暂无积分明细</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-warm-100 text-left text-xs text-warm-400">
+                  <th className="pb-3 pr-4 font-medium">日期</th>
+                  <th className="pb-3 pr-4 font-medium">小朋友</th>
+                  <th className="pb-3 pr-4 font-medium">积分来源</th>
+                  <th className="pb-3 text-right font-medium">变动</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPointDetails.map((detail) => (
+                  <tr key={detail.id} className="border-b border-warm-50 last:border-0">
+                    <td className="py-3 pr-4 text-warm-500 whitespace-nowrap">
+                      {new Date(detail.date).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}
+                    </td>
+                    <td className="py-3 pr-4 text-warm-700 whitespace-nowrap">{detail.memberName}</td>
+                    <td className="py-3 pr-4 text-warm-700">
+                      <span>{detail.taskName}</span>
+                      <span className="block text-xs text-warm-400 mt-0.5">
+                        {CATEGORY_CHART_CONFIG[detail.category]?.label || "其他"} · 任务完成
+                      </span>
+                    </td>
+                    <td className="py-3 text-right font-semibold text-candy-green whitespace-nowrap">
+                      +{formatPoints(detail.points)}⭐
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

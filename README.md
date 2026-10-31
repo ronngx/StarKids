@@ -212,6 +212,9 @@ Open your browser at [http://localhost:3000](http://localhost:3000)
 | 命令 Command | 说明 Description |
 |-------------|------------------|
 | `npm run dev` | 启动开发服务器 / Start dev server |
+| `npm run deploy-dev` | 安装依赖、同步开发数据库并后台启动开发服务器 / Prepare and start the dev server in the background |
+| `npm run stop` | 停止当前项目的开发服务器和匹配的生产 systemd 服务 / Stop the project's dev server and matching production systemd service |
+| `npm run restart` | 重启脚本启动的开发服务器 / Restart the scripted dev server |
 | `npm run build` | 构建生产版本 / Build for production |
 | `npm run start` | 启动生产服务器 / Start production server |
 | `npm run lint` | 代码检查 / Lint code |
@@ -236,7 +239,7 @@ npm run build
 npm run start
 ```
 
-也可以使用项目内的部署脚本。它会检查生产环境变量、备份 SQLite 数据库、安装依赖、生成 Prisma Client、应用迁移并构建。直接执行时会自动检查用户级 `starkids.service`：如果其工作目录属于当前项目，则在构建成功后重启该服务；未检测到时以前台方式启动 Next.js。前台启动模式会在安装依赖和构建之前检查端口，端口已占用时直接提示并退出。使用 `--no-start` 时会在构建后退出，适合由 PM2 或容器编排器启动应用。
+也可以使用项目内的部署脚本。它会检查生产环境变量、备份 SQLite 数据库、安装依赖、生成 Prisma Client、应用迁移并构建。直接执行时会自动检查用户级 `starkids.service`：如果其工作目录属于当前项目，则在构建成功后重启该服务；未检测到时以前台方式启动 Next.js。前台启动模式会在安装依赖和构建之前检查端口，端口已占用时直接提示并退出。使用 `--no-start` 时会在构建后退出，适合由 PM2 或容器编排器启动应用。`npm run stop` 默认会停止当前项目的开发服务器和匹配的用户级 systemd 生产服务；也可以使用 `--dev-only` 或 `--production-only` 只停止其中一种。
 
 ```bash
 # 直接部署：自动识别并重启当前项目的 starkids.service
