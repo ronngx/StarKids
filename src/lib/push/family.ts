@@ -152,7 +152,24 @@ export async function sendFamilyTaskCompletionPush(params: {
     },
   })
 
-  return Promise.all(parents.map((parent) => sendParentTaskCompletionPush({
+  const sendKeys = new Set<string>()
+  const recipients = parents.filter((parent) => {
+    const setting = parent.pushSetting
+    if (!setting?.enabled) return true
+
+    try {
+      // Legacy family settings were copied to every parent. Compare plaintext
+      // keys because saving the same key again produces different ciphertext.
+      const sendKey = decryptServerChanSendKey(setting.sendKeyCiphertext).trim()
+      if (sendKeys.has(sendKey)) return false
+      sendKeys.add(sendKey)
+    } catch {
+      // Let the normal delivery flow record invalid settings as FAILED.
+    }
+    return true
+  })
+
+  return Promise.all(recipients.map((parent) => sendParentTaskCompletionPush({
     parent,
     timezone: family.timezone,
     ...params,

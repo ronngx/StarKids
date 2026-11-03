@@ -182,6 +182,44 @@ test("每位家长的 SendKey 都会独立收到一次任务推送", async () =>
   }
 })
 
+for (const sharedCiphertext of [true, false]) {
+  test(`家长共用 SendKey 只推送一次（${sharedCiphertext ? "迁移复制配置" : "分别加密保存"}）`, async () => {
+    const sendKey = "sctp12345t-test-secret"
+    const ciphertext = encryptServerChanSendKey(sendKey)
+    await db.parentPushSetting.create({
+      data: { parentMemberId: "parent-member", sendKeyCiphertext: ciphertext },
+    })
+    await db.user.create({ data: { id: "parent2", username: "parent2", role: "PARENT" } })
+    await db.familyMember.create({
+      data: { id: "parent2-member", familyId: "family", userId: "parent2", role: "PARENT" },
+    })
+    await db.parentPushSetting.create({
+      data: {
+        parentMemberId: "parent2-member",
+        sendKeyCiphertext: sharedCiphertext ? ciphertext : encryptServerChanSendKey(sendKey),
+      },
+    })
+    await db.task.update({ where: { id: taskId }, data: { autoApprove: !sharedCiphertext } })
+
+    const originalFetch = globalThis.fetch
+    const requestUrls: string[] = []
+    globalThis.fetch = async (input) => {
+      requestUrls.push(String(input))
+      return new Response(JSON.stringify({ code: 0, message: "发送成功" }), { status: 200 })
+    }
+    try {
+      await actions.completeTask(taskId)
+      assert.deepEqual(requestUrls, [`https://12345.push.ft07.com/send/${sendKey}.send`])
+      assert.equal(await db.pushDelivery.count({ where: { status: "SENT" } }), 1)
+      assert.equal(await db.notification.count({ where: { type: "TASK_COMPLETED" } }), 2)
+      await assert.rejects(actions.completeTask(taskId), /今天已经提交过/)
+      assert.equal(requestUrls.length, 1)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+}
+
 test("家长审核后可取消，重复审核不会重复加分", async () => {
   await addAchievement()
   await actions.completeTask(taskId)
